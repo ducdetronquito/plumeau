@@ -26,18 +26,6 @@ print(mario.pk, mario.name, mario.age, mario.size)
 luigi = User.objects.create(name='Luigi', age=23, size=1.83)
 print(luigi.pk, luigi.name, luigi.age, luigi.size)
 
-wario = User()
-wario.name, wario.age, wario.size = 'Wario', 42, 1.53
+wario = User(name='Wario', age=42)
 wario.save()
-
-mario.name = 'MarioBros'
-mario.save()
-
-"""
-kart = Car.objects.create(name='Kart', owner=mario)
-queryset = User.objects.where(User.name == 'Mario', User.age > 18)
-
-for value in queryset:
-    print(value)
-"""
 

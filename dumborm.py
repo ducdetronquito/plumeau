@@ -4,9 +4,7 @@ import sqlite3
 
 """
 To do:
-    1. Be able to update a instance
-    2. Be able to retrieve a Model instance from the database
-    3. Be able to make queries on a Model and retrieve the result as a list of Model instance.
+    1. Be able to retrieve a Model instance from the database
 """
 
 # The Criterion should be evaluated in itself of by QuerySet ?
@@ -72,7 +70,7 @@ class Manager:
         print('SELECT {args} from {table}'.format(args=args, table=self._model.__name__))
     
     def update(self, criterion, **kwargs):
-        pass 
+       raise NotImplementedError("Updating model is not available now") 
 
     def where(self, *args):
         self._queryset = self._queryset or QuerySet()
@@ -270,14 +268,21 @@ class Model(metaclass=BaseModel):
         self._values = { fieldname: None for fieldname in self._fieldnames }
         
         for attr_name, attr_value in kwargs.items():
-            setattr(self, attr_name, attr_value)
-   
+            if hasattr(self, attr_name):
+                setattr(self, attr_name, attr_value)
+            else:
+                raise AttributeError('<{}> model has no field "{}".'.format(self.__class__.__name__, attr_name))
+
+        for fieldname, value in self._values.items():
+            if getattr(self.__class__, fieldname).required and value is None:
+                raise AttributeError('<{}> "{}" field is required: you need to provide a value.'.format(self.__class__.__name__, fieldname))
+
     def save(self):
         if self.pk is None:
             values = {field: value for field, value in self._values.items() if field != 'pk'}
             self.__class__.objects.create(**values)
         else:
-            self.__class__.objects.update(**self._values)
+            self.__class__.objects.update(User.pk == self.pk, **self._values)
 
 class Database:
 
