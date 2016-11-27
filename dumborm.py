@@ -4,7 +4,11 @@ import sqlite3
 
 """
 To do:
-    1. Be able to retrieve a Model instance from the database
+    - Make a proper test file
+    - Refactor interface of Manager/QuerySet
+    - Handle AND/OR filters
+    - Handle ORDER BY
+    - Handle Foreign Keys T_T
 """
 
 # The Criterion should be evaluated in itself of by QuerySet ?
@@ -16,25 +20,33 @@ class Criterion:
         self.value = value
 
     def evaluate(self):
-        return ' '.join((self.field.name, self.operator, str(self.value)))
+        return ' '.join((self.field, self.operator, str(self.value)))
 
 class QuerySet:
     
-    def __init__(self):
+    def __init__(self, model):
+        self._model = model
         self._criteria = []
 
-    def where(self, *args):
+    def filter(self, *args):
         self._criteria.extend(args)
         return self
 
     def __iter__(self): 
         criteria = ' AND '.join([criterion.evaluate() for criterion in self._criteria])
+     
+        query = 'SELECT {fields} FROM {table} WHERE {filters}'.format(
+            fields='*',
+            table=self._model.__name__.lower(),
+            filters=criteria,
+        )
         
-        print('SELECT * FROM Table WHERE {}'.format(criteria))
-        return iter([])
-        # The DB call should be here.
-        #return iter(['The', 'result', 'should', 'be', 'here.'])
+        print(query)
 
+        return iter([
+            self._model(**{fieldname: value for fieldname, value in zip(self._model._fieldnames, instance)})
+            for instance in self._model._db.select(query)
+        ])
 
 class Manager:
 
@@ -66,6 +78,7 @@ class Manager:
 
     def select(self, *args):
         """Fetch related data an create model instance."""
+        """
         args = ', '.join(args) or '*'
         query = 'SELECT {args} from {table}'.format(args=args, table=self._model.__name__.lower())
         print(query)
@@ -74,14 +87,14 @@ class Manager:
             self._model(**{fieldname: value for fieldname, value in zip(self._model._fieldnames, instance)})
             for instance in self._model._db.select(query)
         ]
+        """
+        return QuerySet(self._model)
 
     def update(self, criterion, **kwargs):
        raise NotImplementedError("Updating model is not available now") 
 
-    def where(self, *args):
-        self._queryset = self._queryset or QuerySet()
-        
-        return self._queryset.where(*args)
+    def filter(self, *args):
+        return QuerySet(self._model).filter(*args)
 
     def order_by(self, *args):
         self._queryset = self._queryset or QuerySet()
@@ -182,11 +195,11 @@ class Field(BaseField):
 
     def __eq__(self, other):
         if self.is_valid(other):
-            return Criterion(self, '=', other)
+            return Criterion(self.name, '=', other)
 
     def __ne__(self, other):
         if self.is_valid(other):
-            return Criterion(self, '<>', other)
+            return Criterion(self.name, '<>', other)
 
     def _to_sql(self):
         return ' '.join([
@@ -205,19 +218,19 @@ class TextField(Field):
 class NumericField(Field):
     def __lt__(self, other):
         if self.is_valid(other):
-            return Criterion(self, '<', other)
+            return Criterion(self.name, '<', other)
 
     def __le__(self, other):
         if self.is_valid(other): 
-            return Criterion(self, '<=', other)
+            return Criterion(self.name, '<=', other)
 
     def __gt__(self, other):
         if self.is_valid(other):
-            return Criterion(self, '>', other)
+            return Criterion(self.name, '>', other)
 
     def __ge__(self, other):
         if self.is_valid(other):
-            return Criterion(self, '>=', other)
+            return Criterion(self.name, '>=', other)
 
 
 class IntegerField(NumericField):

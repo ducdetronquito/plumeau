@@ -30,5 +30,9 @@ wario = User(name='Wario', age=42)
 wario.size = 2.22
 wario.save()
 
-for user in User.objects.select():
-    print(user)
+peach = User.objects.create(name="Peach", age=16, size=1.60)
+
+queryset = User.objects.filter(User.age > 18, User.size > 1.80)
+
+for instance in queryset:
+    print(instance)
