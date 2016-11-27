@@ -27,5 +27,8 @@ luigi = User.objects.create(name='Luigi', age=23, size=1.83)
 print(luigi.pk, luigi.name, luigi.age, luigi.size)
 
 wario = User(name='Wario', age=42)
+wario.size = 2.22
 wario.save()
 
+for user in User.objects.select():
+    print(user)

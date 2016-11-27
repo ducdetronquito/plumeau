@@ -67,8 +67,14 @@ class Manager:
     def select(self, *args):
         """Fetch related data an create model instance."""
         args = ', '.join(args) or '*'
-        print('SELECT {args} from {table}'.format(args=args, table=self._model.__name__))
-    
+        query = 'SELECT {args} from {table}'.format(args=args, table=self._model.__name__.lower())
+        print(query)
+        
+        return [
+            self._model(**{fieldname: value for fieldname, value in zip(self._model._fieldnames, instance)})
+            for instance in self._model._db.select(query)
+        ]
+
     def update(self, criterion, **kwargs):
        raise NotImplementedError("Updating model is not available now") 
 
@@ -283,6 +289,12 @@ class Model(metaclass=BaseModel):
             self.__class__.objects.create(**values)
         else:
             self.__class__.objects.update(User.pk == self.pk, **self._values)
+    
+    def __str__(self):
+        return "{model}<{values}>".format(
+            model=self.__class__.__name__,
+            values=str(self._values)[1:-1],
+        )
 
 class Database:
 
@@ -291,7 +303,7 @@ class Database:
         self._connection = sqlite3.connect(self.db_name)
         
         #self._connection.execute('PRAGMA foreign_keys = ON')
-    
+   
     def insert_into(self, query, values):
         last_row_id = None
 
@@ -301,6 +313,10 @@ class Database:
             self._connection.commit()
         
         return last_row_id
+    
+    def select(self, query):
+        with closing(self._connection.cursor()) as cursor:
+            return cursor.execute(query).fetchall()
 
     def create_table(self, model_class):
         
