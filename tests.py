@@ -1,38 +1,45 @@
-import os
-from dumborm import *
+import unittest
+from plume import *
 
-try:
-    os.remove('db_test.db')
-except FileNotFoundError:
-    pass
-
-class User(Model):
-    name = TextField(unique=True)
-    age  = IntegerField()
-    size = FloatField(required=False)
-
-class Car(Model):
-    name  = TextField()
-    owner = ForeignKeyField(User, related_field='cars')
+class DatabaseTests(unittest.TestCase):
     
+    class User(Model):
+        name = TextField()
 
-db = Database('db_test.db')
+    db_name = 'test.db'
 
-db.register(User)#, Car)
+    def setUp(self):
+        print("setup")
 
-mario = User.objects.create(name='Mario', age=20, size=1.60)
-print(mario.pk, mario.name, mario.age, mario.size)
+    def test_register_a_custom_model(self):
+        
+        DatabaseTests.User
 
-luigi = User.objects.create(name='Luigi', age=23, size=1.83)
-print(luigi.pk, luigi.name, luigi.age, luigi.size)
 
-wario = User(name='Wario', age=42)
-wario.size = 2.22
-wario.save()
+    def test_register_a_non_custom_model(self):
+        print("b")
 
-peach = User.objects.create(name="Peach", age=16, size=1.60)
+    def test_register_several_custom_models(self):
+        pass
 
-queryset = User.objects.filter(User.age > 18, User.size > 1.80)
+    def test_store_a_database_reference_into_model_when_registered(self):
+        pass
 
-for instance in queryset:
-    print(instance)
+    def test_create_a_new_table(self):
+        pass
+
+    def test_create_an_existing_table(self):
+        pass
+
+    def test_create_table_with_model_name_as_table_name(self):
+        pass
+
+    def tearDown(self):
+        try:
+            os.remove('tests.db')
+        except:
+            return
+
+if __name__ == '__main__':
+    unittest.main()
+

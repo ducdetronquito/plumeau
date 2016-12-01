@@ -1,15 +1,16 @@
-# DumbORM:
+# Plume:
 
 ## Description:
 
-DumbORM is a single file, minimalist ORM for sqlite3 database.
+Plume is a single file, minimalist ORM for sqlite3 database.
 It is not suited for production, and might never be.
 Nevertheless, it aims to be an eductional support to 
 python newcomer by keeping a codebase as clean as
-possible.
+possible. Moreover, it is my own way to improve my understanding on ORMs.
 
-DumbORM only dependency is the Python Standard Library.
+Plume only dependency is the Python Standard Library.
 
+/!\ Some major API changes are about to come, the README is not up to date for now /!\
 ## Features:
 
 1. Models to interact with tables in database.
