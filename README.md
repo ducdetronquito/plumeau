@@ -21,36 +21,39 @@ Plume only dependency is the Python Standard Library.
 ### 1. Models:
 
 A class-based interface to interact with a table in the database.
-
+```python
 class User(Model):
     username = TextField(max_length=30, unique=True)
     city     = TextField(max_length=100, required=False) 
     age      = IntegerField()
-
+```
 ### 2. QueryManager:
 
 #### Creating and instance:
-
+```python
 User.objects.create(city='Nantes', age=23)
 or
 user = User(city='Nantes', age=23)
 user.save()
-
+```
 #### Creating several instances:
+```python
 users = User.bulk_create([user1, user2, user3])
-
+```
 
 #### Filtering:
-users = User.objects.where(User.city == 'Nantes')
+```python
+users = User.objects.filter(User.city == 'Nantes')
 
-users = result = User.objects.where(User.age > 18)
+users = result = User.objects.filter(User.age > 18)
 
-users = User.objects.where(User.city == 'Nantes' |  User.city == 'Lyon')
+users = User.objects.filter(User.city == 'Nantes' |  User.city == 'Lyon')
 
-users = User.objects.where(User.city == 'Nantes' & User.age > 18)
+users = User.objects.filter(User.city == 'Nantes' & User.age > 18)
+```
 
 #### Selecting: all field by default
-
+```python
 users = User.objects.all()
 or
 users = User.objects.select()
@@ -60,9 +63,11 @@ users = User.objects.select('*')
 users = User.objects.select(User.name, User.age)
 
 users = User.objects.select('name', 'age')
+```
 
-#### Sorting:
+#### Ordering:
+```python
 users = User.objects.order_by(User.age, User.name)
 
 users = User.objects.order_by('age', 'name')
-
+```
