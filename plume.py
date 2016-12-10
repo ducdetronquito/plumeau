@@ -5,6 +5,7 @@ import sqlite3
 """
 To do:
     - Make a proper test file
+    - Comply to PEP8 and Google Python Style Guide as much as possible.
     - Refactor interface of Manager/QuerySet
     - Handle AND/OR filters
     - Handle ORDER BY
@@ -21,6 +22,7 @@ class Criterion:
 
     def evaluate(self):
         return ' '.join((self.field, self.operator, str(self.value)))
+
 
 class QuerySet:
     
@@ -40,13 +42,12 @@ class QuerySet:
             table=self._model.__name__.lower(),
             filters=criteria,
         )
-        
-        print(query)
 
         return iter([
             self._model(**{fieldname: value for fieldname, value in zip(self._model._fieldnames, instance)})
             for instance in self._model._db.select(query)
         ])
+
 
 class Manager:
 
@@ -68,7 +69,6 @@ class Manager:
             placeholders=('?,'*len(values))[:-1]
         )
         vals = tuple([value[1] for value in values])
-        print(query, '=>',vals)
 
         last_row_id = self._model._db.insert_into(query, vals)
         values.append(('pk',  last_row_id))
@@ -309,13 +309,12 @@ class Model(metaclass=BaseModel):
             values=str(self._values)[1:-1],
         )
 
+
 class Database:
 
     def __init__(self, db_name):
         self.db_name = db_name
         self._connection = sqlite3.connect(self.db_name)
-        
-        #self._connection.execute('PRAGMA foreign_keys = ON')
    
     def insert_into(self, query, values):
         last_row_id = None
@@ -332,30 +331,28 @@ class Database:
             return cursor.execute(query).fetchall()
 
     def create_table(self, model_class):
-        
-        query = 'CREATE TABLE IF NOT EXISTS {table_name} ({columns})'
-       
+         
         fields = [
             getattr(model_class, fieldname)._to_sql()
             for fieldname in model_class._fieldnames
         ]
 
-        query = query.format(
+        query = 'CREATE TABLE IF NOT EXISTS {table_name} ({columns})'.format(
             table_name=model_class.__name__.lower(),
             columns=', '.join(fields)
         )
-        
-        print(query)
 
         with closing(self._connection.cursor()) as cursor:
             cursor.execute(query) 
             self._connection.commit()
+
     
     def register(self, *args):
-        for model_class in args:
-            model_class._db = self
-            
-            try:
+        try: 
+            for model_class in args:
+                model_class._db = self
                 self.create_table(model_class)
-            except:
-                raise TypeError('{arg} is not a valid Model subclass.'.format(arg=model_class.__name__))
+        except TypeError:
+            raise TypeError('{arg} is not a valid Model subclass.'.format(arg=model_class.__name__))
+
+
