@@ -12,7 +12,6 @@ To do:
     - Handle Foreign Keys T_T
 """
 
-# The Criterion should be evaluated in itself of by QuerySet ?
 class Criterion:
     
     def __init__(self, field, operator, value):
@@ -20,7 +19,7 @@ class Criterion:
         self.operator = operator
         self.value = value
 
-    def evaluate(self):
+    def __str__(self):
         return ' '.join((self.field, self.operator, str(self.value)))
 
 
@@ -33,21 +32,84 @@ class QuerySet:
     def filter(self, *args):
         self._criteria.extend(args)
         return self
-
-    def __iter__(self): 
-        criteria = ' AND '.join([criterion.evaluate() for criterion in self._criteria])
-     
-        query = 'SELECT {fields} FROM {table} WHERE {filters}'.format(
+        
+    def __build_SFW_query(self):
+        query = 'SELECT {fields} FROM {table}'.format(
             fields='*',
             table=self._model.__name__.lower(),
-            filters=criteria,
         )
-
+        
+        if self._criteria:
+            query += ' WHERE ' + ' AND '.join((str(criterion) for criterion in self._criteria))
+        
+        return query
+        
+    def __execute_query(self, query):
         return iter([
-            self._model(**{fieldname: value for fieldname, value in zip(self._model._fieldnames, instance)})
+            self._model(**{
+                fieldname: value for fieldname, value in zip(self._model._fieldnames, instance)
+            })
             for instance in self._model._db.select(query)
         ])
 
+    def __iter__():
+        """
+        Allow to iterate over a QuerySet.
+        
+        A QuerySet can be sliced as a Python list, but with two limitations:
+            - The *step* parameter is ignored
+            - It is not possible to use negative indexes.
+        
+        This operation need to hit the database.
+        
+        Returns:
+            An Iterator containing a model instance list.
+                ex: Iterator(List[Pokemon])
+        """
+        return self.__execute_query(self.__build_SFW_query())
+    
+    def __getitem__(self, key):
+        """
+        Slice a QuerySet.
+        
+        A QuerySet can be sliced as a Python list, but with two limitations:
+            - The *step* parameter is ignored
+            - It is not possible to use negative indexes.
+        
+        This operation need to hit the database.
+        
+        Args:
+            key: an integer representing the index or a slice object.
+            
+        Returns:
+            A Model instance if the the QuerySet if accessed by index.
+                ex: QuerySet<Pokemon>[0] => Pokemon(name='Charamander)
+            
+            Otherwhise, it return a model instance list.
+                ex: QuerySet<Pokemon>[0:3] => List[Pokemon]
+        """
+        # Determine the offset and the number of row to return depending on the
+        # type of the slice.
+        try:
+            offset = key.start if key.start else 0
+            count = (key.stop - offset) if key.stop is not None else -1
+            direct_access = False
+        except:
+            count = 1
+            offset = key
+            direct_access = True
+            
+        query = self.__build_SFW_query()
+                
+        query += ' LIMIT {count} OFFSET {offset}'.format(
+            count=count,
+            offset=offset,
+        )
+
+        result = self.__execute_query(query)
+        
+        return list(result)[0] if direct_access else list(result)
+        
 
 class Manager:
 
@@ -76,30 +138,8 @@ class Manager:
         
         return self._model(**kwargs) 
 
-    def select(self, *args):
-        """Fetch related data an create model instance."""
-        """
-        args = ', '.join(args) or '*'
-        query = 'SELECT {args} from {table}'.format(args=args, table=self._model.__name__.lower())
-        print(query)
-        
-        return [
-            self._model(**{fieldname: value for fieldname, value in zip(self._model._fieldnames, instance)})
-            for instance in self._model._db.select(query)
-        ]
-        """
-        return QuerySet(self._model)
-
-    def update(self, criterion, **kwargs):
-       raise NotImplementedError("Updating model is not available now") 
-
     def filter(self, *args):
         return QuerySet(self._model).filter(*args)
-
-    def order_by(self, *args):
-        self._queryset = self._queryset or QuerySet()
-        
-        return self._queryset.order_by(*args)
 
 
 class RelatedManager(Manager):
@@ -112,7 +152,6 @@ class RelatedManager(Manager):
 
 class BaseModel(type):
     def __new__(cls, clsname, bases, attrs):
-
         fieldnames = []
         # Collect all field names from the base classes.
         for base in bases:
