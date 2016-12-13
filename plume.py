@@ -1,16 +1,31 @@
+from collections import deque
 from contextlib import closing
 from copy import deepcopy
 import sqlite3
 
 """
 To do:
-    - Make a proper test file
-    - Comply to PEP8 and Google Python Style Guide as much as possible.
-    - Refactor interface of Manager/QuerySet
-    - Handle AND/OR filters
+    - Add "in" query operator (>> or tune ==)
     - Handle ORDER BY
+    - Add tests all classes
+    - Comply to PEP8 and Google Python Style Guide as much as possible.
     - Handle Foreign Keys T_T
 """
+
+class Clause(deque):
+    
+    def __and__(self, other):
+        self.appendleft(''.join((str(other), ' AND ')))
+        return self
+    
+    def __or__(self, other):
+        self.appendleft('(')
+        self.append(''.join((' OR ', str(other), ')')))
+        return self
+        
+    def __str__(self):
+        return ''.join((e for e in self))
+
 
 class Criterion:
     
@@ -21,19 +36,50 @@ class Criterion:
 
     def __str__(self):
         return ' '.join((self.field, self.operator, str(self.value)))
+        
+    def __and__(self, other):
+        c = Clause()
+        c.appendleft(''.join((str(self), ' AND ', str(other))))
+        return c
+
+    def __or__(self, other):
+        c = Clause()
+        c.append(''.join(( '(', str(self), ' OR ', str(other), ')')))
+        return c
 
 
 class QuerySet:
+    """A QuerySet allows to forge a lazy SQL query.
+
+    A QuerySet represents a Select-From-Where SQL query, and allow the user to define the WHERE
+    clause. The user is allowed to add dynamically several criteria on a QuerySet. The QuerySet only
+    hit the database when it is iterated over or sliced.
+    """
     
     def __init__(self, model):
         self._model = model
         self._criteria = []
 
     def filter(self, *args):
+        """
+        Allow to filter a QuerySet.
+        
+        A QuerySet can filter as a Python list to select a subset of model instances.
+        It is similar as setting a WHERE clause in a SQL query.
+        
+        This operation does not hit the database.
+        
+        Args:
+            args: a list of Criterion represented in a conjonctive normal form.
+        
+        Returns:
+            A QuerySet
+        """
         self._criteria.extend(args)
         return self
         
     def __build_SFW_query(self):
+        """Returns a Select-From-Where SQL query as a string."""
         query = 'SELECT {fields} FROM {table}'.format(
             fields='*',
             table=self._model.__name__.lower(),
@@ -45,6 +91,7 @@ class QuerySet:
         return query
         
     def __execute_query(self, query):
+        """Query the database and returns the result as a list of model instances."""
         return iter([
             self._model(**{
                 fieldname: value for fieldname, value in zip(self._model._fieldnames, instance)
@@ -60,7 +107,7 @@ class QuerySet:
             - The *step* parameter is ignored
             - It is not possible to use negative indexes.
         
-        This operation need to hit the database.
+        This operation hit the database.
         
         Returns:
             An Iterator containing a model instance list.
@@ -76,7 +123,9 @@ class QuerySet:
             - The *step* parameter is ignored
             - It is not possible to use negative indexes.
         
-        This operation need to hit the database.
+        It is similar as setting a LIMIT/OFFSET clause in a SQL query.
+        
+        This operation hit the database.
         
         Args:
             key: an integer representing the index or a slice object.
@@ -118,7 +167,7 @@ class Manager:
         self._queryset = None
 
     def __get__(self, instance, owner):
-        """A Model Manager is only accessible as a class attribute."""
+        # A Model Manager is only accessible as a class attribute.
         if instance is None:
             return self
 
@@ -145,7 +194,7 @@ class Manager:
 class RelatedManager(Manager):
     
     def __get__(self, instance, owner):
-        """A RelatedManager is only accessible as an instance attribute."""
+        # A RelatedManager is only accessible as an instance attribute.
         if instance is not None:
             return self
 
