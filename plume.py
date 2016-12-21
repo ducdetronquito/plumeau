@@ -108,6 +108,12 @@ class QuerySet:
         self._clause = None
         self._count = None
         self._offset = None
+    
+    def __str__(self):
+        return ''.join((
+            '(', SQLiteAPI.select(
+                self._tables, self._fields, self._clause, self._count, self._offset), ')'
+        ))
 
     def filter(self, *args):
         """
@@ -141,7 +147,6 @@ class QuerySet:
         
     def __execute(self):
         """Query the database and returns the result as a list of model instances."""
-        
         query = SQLiteAPI.select(
             self._tables, self._fields, self._clause, self._count, self._offset
         )

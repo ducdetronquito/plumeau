@@ -20,6 +20,16 @@ class TrainerTestCase(TestCase):
         }
     }
 
+class QuerySetAPI(TrainerTestCase):
+    
+    def test_output_queryset_as_string(self):
+        expected = str(Trainer.objects.filter(Trainer.age > 18, Trainer.name != 'Giovanni'))
+        
+        self.assertEqual(
+            "(SELECT * FROM trainer WHERE name != 'Giovanni' AND age > 18)",
+            expected,
+        )
+            
 
 class QuerySetSliceTests(TrainerTestCase):
     
@@ -92,8 +102,6 @@ class QuerySetResultsTests(TrainerTestCase):
         self.assertEqual(jessie.name, 'Jessie')
         self.assertEqual(jessie.age, 17)
         
-        
-
     def test_select_from_one_table_with_one_criterion(self):
         self.add_fixture(Trainer, ['Giovanni', 'James', 'Jessie'])
         
@@ -108,7 +116,6 @@ class QuerySetResultsTests(TrainerTestCase):
         self.assertEqual(james.name, 'James')
         self.assertEqual(james.age, 21)
         
-        
     def test_select_from_one_table_with_ANDs_criteria_operator(self):
         self.add_fixture(Trainer, ['Giovanni', 'James', 'Jessie'])
         
@@ -119,7 +126,6 @@ class QuerySetResultsTests(TrainerTestCase):
         
         self.assertEqual(james.name, 'James')
         self.assertEqual(james.age, 21)
-
 
     def test_select_from_one_table_with_ANDs_criteria_list(self):
         self.add_fixture(Trainer, ['Giovanni', 'James', 'Jessie'])
@@ -144,5 +150,21 @@ class QuerySetResultsTests(TrainerTestCase):
         
         self.assertEqual(james.name, 'James')
         self.assertEqual(james.age, 21)
+
+    def test_select_from_one_table_with_inner_query(self):
+        """
+        self.add_fixture(Trainer, ['Giovanni', 'James', 'Jessie'])
+        
+        queryset = Trainer.objects.filter(Trainer.name != 'Giovanni') 
+        queryset.filter(Trainer.age > Trainer.objects.select('age').filter(Trainer.name == 'Jessie'))
+        result = list(queryset)
+        
+        self.assertEqual(len(result), 1)
+        james = result[0]
+        
+        self.assertEqual(james.name, 'James')
+        self.assertEqual(james.age, 21)
+        """
+        pass
 
 

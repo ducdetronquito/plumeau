@@ -35,3 +35,9 @@ class SQLiteAPITests(TestCase):
             SQLiteAPI.select(tables='pokemon', where='name = Pikachu AND level > 18'),
             'SELECT * FROM pokemon WHERE name = Pikachu AND level > 18',
         )
+        
+    def test_select_from_one_table_with_count_and_offset(self):
+        self.assertEqual(
+            SQLiteAPI.select(tables='pokemon', count=10, offset=42),
+            'SELECT * FROM pokemon LIMIT 10 OFFSET 42',
+        )
