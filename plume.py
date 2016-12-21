@@ -7,6 +7,7 @@ import sqlite3
 To do:
     - Add "in" query operator (>> or tune ==)
     - Handle ORDER BY
+    - Handle query operations (Count, Sum)
     - Add tests all classes
     - Comply to PEP8 and Google Python Style Guide as much as possible.
     - Handle Foreign Keys T_T
@@ -357,6 +358,14 @@ class TextField(Field):
             return Criterion(self.name, '!=', ''.join(("'", other, "'")))
 
 
+    def __lshift__(self, other):
+        """IN operator."""
+        if all((self.is_valid(e) for e in other)):
+            csv_values = ', '.join( (''.join(("'", str(e), "'")) for e in other) )
+            
+            return Criterion(self.name, 'IN', ''.join(('(', csv_values, ')')))
+
+
 class NumericField(Field):
     
     def __eq__(self, other):
@@ -382,6 +391,13 @@ class NumericField(Field):
     def __ge__(self, other):
         if self.is_valid(other):
             return Criterion(self.name, '>=', other)
+    
+    def __lshift__(self, other):
+        """IN operator."""
+        if all((self.is_valid(e) for e in other)):
+            csv_values = ', '.join((str(e) for e in other))
+            
+            return Criterion(self.name, 'IN', ''.join(('(', csv_values, ')')))
 
 
 class IntegerField(NumericField):
@@ -502,7 +518,6 @@ class Database:
         with closing(self._connection.cursor()) as cursor:
             cursor.execute(query) 
             self._connection.commit()
-
     
     def register(self, *args):
         try: 

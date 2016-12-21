@@ -150,6 +150,20 @@ class QuerySetResultsTests(TrainerTestCase):
         
         self.assertEqual(james.name, 'James')
         self.assertEqual(james.age, 21)
+        
+    def test_select_from_one_table_with_in_operator(self):
+        self.add_fixture(Trainer, ['Giovanni', 'James', 'Jessie'])
+        
+        result = list(Trainer.objects.filter(Trainer.age << [17, 21]))
+                
+        self.assertEqual(len(result), 2)
+        james, jessie = result
+        
+        self.assertEqual(james.name, 'James')
+        self.assertEqual(james.age, 21)
+        
+        self.assertEqual(jessie.name, 'Jessie')
+        self.assertEqual(jessie.age, 17)
 
     def test_select_from_one_table_with_inner_query(self):
         """
