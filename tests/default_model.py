@@ -1,6 +1,7 @@
-import unittest
+from unittest import TestCase
 
-class DefaultModelTests(unittest.TestCase):
+
+class DefaultModelTests(TestCase):
         
     def test_fieldnames_class_attribute_contains_primary_key_field_name(self):
         from plume import Model
@@ -20,4 +21,16 @@ class DefaultModelTests(unittest.TestCase):
         from plume import Model
         m = Model(pk=1)
         self.assertEqual(Model.pk, 1)
+        
+    def test_two_equivalent_models_are_equals(self):
+        from plume import Model
+        m1 = Model(pk=1)
+        m2 = Model(pk=1)
+        self.assertTrue(m1 == m2)
+        
+    def test_two_different_models_are_not_equals(self):
+        from plume import Model
+        m1 = Model(pk=1)
+        m2 = Model(pk=2)
+        self.assertFalse(m1 == m2)
 
