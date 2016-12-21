@@ -23,30 +23,29 @@ class SQLiteAPI:
     OFFSET = ' OFFSET '
     
     @classmethod
-    def select(cls, params):
+    def select(cls, tables, fields=None, where=None, count=None, offset=None):
         query = []
         
         query.extend((
-            SQLiteAPI.SELECT, SQLiteAPI.to_csv(params.get('fields', '*')),
+            SQLiteAPI.SELECT, SQLiteAPI.to_csv(fields or '*'),
         ))
         
-        if 'tables' in params:
-            query.extend((
-                SQLiteAPI.FROM, SQLiteAPI.to_csv(params['tables']),
-            ))
+        query.extend((
+            SQLiteAPI.FROM, SQLiteAPI.to_csv(tables),
+        ))
         
-        if 'where' in params:
+        if where is not None:
             query.extend((
-                SQLiteAPI.WHERE, str(params['where']),
+                SQLiteAPI.WHERE, str(where),
             ))
             
-        if 'limit' in params:
+        if count is not None and offset is not None:
             query.extend((
-                SQLiteAPI.LIMIT, str(params['limit'][0]), SQLiteAPI.OFFSET, str(params['limit'][1]),
+                SQLiteAPI.LIMIT, str(count), SQLiteAPI.OFFSET, str(offset),
             ))
         
         return ''.join(query)
-        
+
     @staticmethod
     def to_csv(values):
         """Convert a string value or a sequence of string values into a coma-separated string."""
@@ -104,8 +103,11 @@ class QuerySet:
     
     def __init__(self, model):
         self._model = model
-        self._criteria = []
+        self._tables = [model.__name__.lower()]
+        self._fields = None
         self._clause = None
+        self._count = None
+        self._offset = None
 
     def filter(self, *args):
         """
@@ -122,16 +124,28 @@ class QuerySet:
         Returns:
             A QuerySet
         """
-        #self._criteria.extend(args)
-        self._clause = self._clause or Clause()
-        
-        for element in args:
-            self._clause &= element
+        if args:
+            self._clause = self._clause or Clause()
+            
+            for element in args:
+                self._clause &= element
 
         return self
         
-    def __execute_query(self, query):
+    def slice(self, count, offset):
+        """ Slice a QuerySet without hiting the database."""
+        self._count = count
+        self._offset = offset
+
+        return self
+        
+    def __execute(self):
         """Query the database and returns the result as a list of model instances."""
+        
+        query = SQLiteAPI.select(
+            self._tables, self._fields, self._clause, self._count, self._offset
+        )
+        
         return iter([
             self._model(**{
                 fieldname: value for fieldname, value in zip(self._model._fieldnames, instance)
@@ -153,14 +167,7 @@ class QuerySet:
             An Iterator containing a model instance list.
                 ex: Iterator(List[Pokemon])
         """
-        params = {
-            'tables': self._model.__name__.lower(),
-        }
-        
-        if self._clause:
-            params['where'] = self._clause
-    
-        return self.__execute_query(SQLiteAPI.select(params))
+        return self.__execute()
     
     def __getitem__(self, key):
         """
@@ -195,18 +202,12 @@ class QuerySet:
             offset = key
             direct_access = True
         
-        params = {
-            'tables': self._model.__name__.lower(),
-            'limit': (count, offset),
-        }
-        
-        if self._criteria:
-            params['where'] = (str(criterion) for criterion in self._criteria)
+        self.slice(count, offset)
             
-        result = self.__execute_query(SQLiteAPI.select(params))
+        result = self.__execute()
         
         return list(result)[0] if direct_access else list(result)
-        
+
 
 class Manager:
 
