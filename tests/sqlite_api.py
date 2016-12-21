@@ -44,7 +44,7 @@ class SQLiteAPITests(TestCase):
         self.assertEqual(
             SQLiteAPI.select({
                 'tables': 'pokemon',
-                'where': ('name = Pikachu AND level > 18',),
+                'where': 'name = Pikachu AND level > 18',
             }),
             'SELECT * FROM pokemon WHERE name = Pikachu AND level > 18',
         )

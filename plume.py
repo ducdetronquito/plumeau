@@ -37,7 +37,7 @@ class SQLiteAPI:
         
         if 'where' in params:
             query.extend((
-                SQLiteAPI.WHERE, ''.join(params['where']),
+                SQLiteAPI.WHERE, str(params['where']),
             ))
             
         if 'limit' in params:
@@ -46,7 +46,7 @@ class SQLiteAPI:
             ))
         
         return ''.join(query)
-
+        
     @staticmethod
     def to_csv(values):
         """Convert a string value or a sequence of string values into a coma-separated string."""
@@ -58,11 +58,14 @@ class SQLiteAPI:
 
 class Clause(deque):
     
-    def __init__(self, value):
-        self.append(value)
+    def __init__(self, value=None):
+        if value is not None:
+            self.append(value)
     
     def __and__(self, other):
-        self.appendleft(''.join((str(other), SQLiteAPI.AND)))
+        clause = ''.join((str(other), SQLiteAPI.AND)) if len(self) else str(other)
+            
+        self.appendleft(clause)
         return self
     
     def __or__(self, other):
@@ -102,6 +105,7 @@ class QuerySet:
     def __init__(self, model):
         self._model = model
         self._criteria = []
+        self._clause = None
 
     def filter(self, *args):
         """
@@ -118,8 +122,12 @@ class QuerySet:
         Returns:
             A QuerySet
         """
-        self._criteria.extend(args)
+        #self._criteria.extend(args)
+        self._clause = self._clause or Clause()
         
+        for element in args:
+            self._clause &= element
+
         return self
         
     def __execute_query(self, query):
@@ -149,8 +157,8 @@ class QuerySet:
             'tables': self._model.__name__.lower(),
         }
         
-        if self._criteria:
-            params['where'] = (str(criterion) for criterion in self._criteria)
+        if self._clause:
+            params['where'] = self._clause
     
         return self.__execute_query(SQLiteAPI.select(params))
     

@@ -71,7 +71,7 @@ class QuerySetSliceTests(TrainerTestCase):
         self.assertEqual(trainers[0].age, 42)
         self.assertEqual(trainers[1].name, 'James')
         self.assertEqual(trainers[1].age, 21)
-        
+
 
 class QuerySetResultsTests(TrainerTestCase):
     
@@ -109,10 +109,35 @@ class QuerySetResultsTests(TrainerTestCase):
         self.assertEqual(james.age, 21)
         
         
-    def test_select_from_one_table_with_several_criteria(self):
+    def test_select_from_one_table_with_ANDs_criteria_operator(self):
         self.add_fixture(Trainer, ['Giovanni', 'James', 'Jessie'])
         
         result = list(Trainer.objects.filter((Trainer.age > 18)  & (Trainer.name != 'Giovanni')))
+        
+        self.assertEqual(len(result), 1)
+        james = result[0]
+        
+        self.assertEqual(james.name, 'James')
+        self.assertEqual(james.age, 21)
+
+
+    def test_select_from_one_table_with_ANDs_criteria_list(self):
+        self.add_fixture(Trainer, ['Giovanni', 'James', 'Jessie'])
+        
+        result = list(Trainer.objects.filter(Trainer.age > 18, Trainer.name != 'Giovanni'))
+        
+        self.assertEqual(len(result), 1)
+        james = result[0]
+        
+        self.assertEqual(james.name, 'James')
+        self.assertEqual(james.age, 21)
+        
+    def test_select_from_one_table_with_chained_filters(self):
+        self.add_fixture(Trainer, ['Giovanni', 'James', 'Jessie'])
+        
+        queryset = Trainer.objects.filter(Trainer.age > 18) 
+        queryset.filter(Trainer.name != 'Giovanni')
+        result = list(queryset)
         
         self.assertEqual(len(result), 1)
         james = result[0]
