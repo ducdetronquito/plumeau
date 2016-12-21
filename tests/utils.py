@@ -4,9 +4,7 @@ import os
 from sys import modules
 import unittest
 
-
-DB_NAME = 'test.db'
-
+DB_NAME = ':memory:'
 
 class Pokemon(Model):
     name = TextField()
@@ -26,8 +24,6 @@ class TestCase(unittest.TestCase):
         for model in self.FIXTURES.get('models', ()):
             db.register(model)
         
-    def tearDown(self):
-        os.remove(DB_NAME)
         
     def add_fixture(self, model_class, values):
         
