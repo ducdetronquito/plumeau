@@ -12,15 +12,62 @@ To do:
     - Handle Foreign Keys T_T
 """
 
+class SQLiteAPI:
+    
+    AND = ' AND '
+    OR = ' OR '
+    SELECT = 'SELECT '
+    FROM = ' FROM '
+    WHERE = ' WHERE '
+    LIMIT = ' LIMIT '
+    OFFSET = ' OFFSET '
+    
+    @classmethod
+    def select(cls, params):
+        query = []
+        
+        query.extend((
+            SQLiteAPI.SELECT, SQLiteAPI.to_csv(params.get('fields', '*')),
+        ))
+        
+        if 'tables' in params:
+            query.extend((
+                SQLiteAPI.FROM, SQLiteAPI.to_csv(params['tables']),
+            ))
+        
+        if 'where' in params:
+            query.extend((
+                SQLiteAPI.WHERE, ''.join(params['where']),
+            ))
+            
+        if 'limit' in params:
+            query.extend((
+                SQLiteAPI.LIMIT, str(params['limit'][0]), SQLiteAPI.OFFSET, str(params['limit'][1]),
+            ))
+        
+        return ''.join(query)
+
+    @staticmethod
+    def to_csv(values):
+        """Convert a string value or a sequence of string values into a coma-separated string."""
+        try:
+            return values.lower()
+        except AttributeError:
+            return ', '.join((v.lower() for v in values))
+            
+
 class Clause(deque):
     
+    def __init__(self, value):
+        self.append(value)
+    
     def __and__(self, other):
-        self.appendleft(''.join((str(other), ' AND ')))
+        self.appendleft(''.join((str(other), SQLiteAPI.AND)))
         return self
     
     def __or__(self, other):
         self.appendleft('(')
-        self.append(''.join((' OR ', str(other), ')')))
+        self.append(''.join((SQLiteAPI.OR, str(other), ')')))
         return self
         
     def __str__(self):
@@ -38,14 +85,10 @@ class Criterion:
         return ' '.join((self.field, self.operator, str(self.value)))
         
     def __and__(self, other):
-        c = Clause()
-        c.appendleft(''.join((str(self), ' AND ', str(other))))
-        return c
+        return Clause(''.join((str(self), SQLiteAPI.AND, str(other))))
 
     def __or__(self, other):
-        c = Clause()
-        c.append(''.join(( '(', str(self), ' OR ', str(other), ')')))
-        return c
+        return Clause(''.join(( '(', str(self), SQLiteAPI.OR, str(other), ')')))
 
 
 class QuerySet:
@@ -76,19 +119,8 @@ class QuerySet:
             A QuerySet
         """
         self._criteria.extend(args)
+        
         return self
-        
-    def __build_SFW_query(self):
-        """Returns a Select-From-Where SQL query as a string."""
-        query = 'SELECT {fields} FROM {table}'.format(
-            fields='*',
-            table=self._model.__name__.lower(),
-        )
-        
-        if self._criteria:
-            query += ' WHERE ' + ' AND '.join((str(criterion) for criterion in self._criteria))
-        
-        return query
         
     def __execute_query(self, query):
         """Query the database and returns the result as a list of model instances."""
@@ -99,7 +131,7 @@ class QuerySet:
             for instance in self._model._db.select(query)
         ])
 
-    def __iter__():
+    def __iter__(self):
         """
         Allow to iterate over a QuerySet.
         
@@ -113,7 +145,14 @@ class QuerySet:
             An Iterator containing a model instance list.
                 ex: Iterator(List[Pokemon])
         """
-        return self.__execute_query(self.__build_SFW_query())
+        params = {
+            'tables': self._model.__name__.lower(),
+        }
+        
+        if self._criteria:
+            params['where'] = (str(criterion) for criterion in self._criteria)
+    
+        return self.__execute_query(SQLiteAPI.select(params))
     
     def __getitem__(self, key):
         """
@@ -147,15 +186,16 @@ class QuerySet:
             count = 1
             offset = key
             direct_access = True
+        
+        params = {
+            'tables': self._model.__name__.lower(),
+            'limit': (count, offset),
+        }
+        
+        if self._criteria:
+            params['where'] = (str(criterion) for criterion in self._criteria)
             
-        query = self.__build_SFW_query()
-                
-        query += ' LIMIT {count} OFFSET {offset}'.format(
-            count=count,
-            offset=offset,
-        )
-
-        result = self.__execute_query(query)
+        result = self.__execute_query(SQLiteAPI.select(params))
         
         return list(result)[0] if direct_access else list(result)
         
@@ -180,7 +220,7 @@ class Manager:
             placeholders=('?,'*len(values))[:-1]
         )
         vals = tuple([value[1] for value in values])
-
+        
         last_row_id = self._model._db.insert_into(query, vals)
         values.append(('pk',  last_row_id))
         kwargs =  {field: value for field, value in values}
@@ -281,14 +321,6 @@ class Field(BaseField):
         if self.is_valid(value):
             instance._values[self.name] = value
 
-    def __eq__(self, other):
-        if self.is_valid(other):
-            return Criterion(self.name, '=', other)
-
-    def __ne__(self, other):
-        if self.is_valid(other):
-            return Criterion(self.name, '<>', other)
-
     def _to_sql(self):
         return ' '.join([
             self.name,
@@ -301,9 +333,26 @@ class Field(BaseField):
 class TextField(Field):
     internal_type = str
     sqlite_datatype = 'TEXT'
-        
+    
+    def __eq__(self, other):
+        if self.is_valid(other):
+            return Criterion(self.name, '=', ''.join(("'", other, "'")))
+
+    def __ne__(self, other):
+        if self.is_valid(other):
+            return Criterion(self.name, '!=', ''.join(("'", other, "'")))
+
 
 class NumericField(Field):
+    
+    def __eq__(self, other):
+        if self.is_valid(other):
+            return Criterion(self.name, '=', other)
+
+    def __ne__(self, other):
+        if self.is_valid(other):
+            return Criterion(self.name, '!=', other)
+
     def __lt__(self, other):
         if self.is_valid(other):
             return Criterion(self.name, '<', other)
@@ -395,6 +444,12 @@ class Model(metaclass=BaseModel):
         return "{model}<{values}>".format(
             model=self.__class__.__name__,
             values=str(self._values)[1:-1],
+        )
+        
+    def __eq__(self, other):
+        return (
+            len(self._values) == len(other._values) and
+            all(other._values[field] == value for field, value in self._values.items())
         )
 
 
