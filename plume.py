@@ -5,7 +5,7 @@ import sqlite3
 
 """
 To do:
-    - Add "in" query operator (>> or tune ==)
+    - Add CREATE TABLE and INSERT INTO into SQLiteAPI
     - Handle ORDER BY
     - Handle query operations (Count, Sum)
     - Add tests all classes
@@ -14,15 +14,43 @@ To do:
 """
 
 class SQLiteAPI:
-    
     AND = ' AND '
-    OR = ' OR '
-    SELECT = 'SELECT '
+    AUTOINCREMENT = 'AUTOINCREMENT'
+    CREATE = 'CREATE TABLE '
+    DEFAULT = 'DEFAULT '
+    IF_NOT_EXISTS = 'IF NOT EXISTS '
     FROM = ' FROM '
-    WHERE = ' WHERE '
+    INTEGER = 'INTEGER'
     LIMIT = ' LIMIT '
+    NOT_NULL = 'NOT NULL'
     OFFSET = ' OFFSET '
+    OR = ' OR '
+    PK = 'PRIMARY KEY'
+    REAL = 'REAL'
+    SELECT = 'SELECT '
+    TEXT = 'TEXT'
+    UNIQUE = 'UNIQUE '
+    WHERE = ' WHERE '
     
+    # Query Operators
+    EQ = '='
+    GE = '>='
+    GT = '>'
+    IN = 'IN'
+    LE = '<='
+    LT = '<'
+    NE = '!='
+
+
+    @classmethod
+    def create_table(cls, name, fields):
+        query = [
+            SQLiteAPI.CREATE, SQLiteAPI.IF_NOT_EXISTS, name.lower(), 
+            '(', ', '.join(fields), ')'
+        ]
+        
+        return ''.join(query)
+
     @classmethod
     def select(cls, tables, fields=None, where=None, count=None, offset=None):
         query = []
@@ -46,7 +74,7 @@ class SQLiteAPI:
             ))
         
         return ''.join(query)
-
+        
     @staticmethod
     def to_csv(values):
         """Convert a string value or a sequence of string values into a coma-separated string."""
@@ -54,7 +82,7 @@ class SQLiteAPI:
             return values.lower()
         except AttributeError:
             return ', '.join((v.lower() for v in values))
-            
+
 
 class Clause(deque):
     
@@ -148,7 +176,7 @@ class QuerySet:
         
     def __execute(self):
         """Query the database and returns the result as a list of model instances."""
-        query = SQLiteAPI.select(
+        values = self._model._db.select(
             self._tables, self._fields, self._clause, self._count, self._offset
         )
         
@@ -156,7 +184,7 @@ class QuerySet:
             self._model(**{
                 fieldname: value for fieldname, value in zip(self._model._fieldnames, instance)
             })
-            for instance in self._model._db.select(query)
+            for instance in values
         ])
 
     def __iter__(self):
@@ -289,11 +317,12 @@ class BaseModel(type):
 
 class BaseField:
     
-    def __init__(self, required=True, unique=False):
+    def __init__(self, required=True, unique=False, default=None):
         self.value = None
         self.name = None
         self.required = required
         self.unique = unique
+        self.default = default
 
     def is_valid(self, value):
         """Return True if the provided value match the internal field."""
@@ -336,26 +365,32 @@ class Field(BaseField):
         if self.is_valid(value):
             instance._values[self.name] = value
 
-    def _to_sql(self):
-        return ' '.join([
-            self.name,
-            self.sqlite_datatype,
-            'UNIQUE' if self.unique else '',
-            'NOT NULL' if self.required else '',
-        ])
+    def sql(self):
+        field_definition = [self.name, self.sqlite_datatype]
+        
+        if self.unique:
+            field_definition.append(SQLiteAPI.UNIQUE)
+        
+        if self.required:
+            field_definition.append(SQLiteAPI.NOT_NULL)
+        
+        if self.default is not None:
+            field_definition.extend((SQLiteAPI.DEFAULT, str(self.default)))
 
+        return field_definition
+    
 
 class TextField(Field):
     internal_type = str
-    sqlite_datatype = 'TEXT'
+    sqlite_datatype = SQLiteAPI.TEXT
     
     def __eq__(self, other):
         if self.is_valid(other):
-            return Criterion(self.name, '=', ''.join(("'", other, "'")))
+            return Criterion(self.name, SQLiteAPI.EQ, ''.join(("'", other, "'")))
 
     def __ne__(self, other):
         if self.is_valid(other):
-            return Criterion(self.name, '!=', ''.join(("'", other, "'")))
+            return Criterion(self.name, SQLiteAPI.NE, ''.join(("'", other, "'")))
 
 
     def __lshift__(self, other):
@@ -363,51 +398,51 @@ class TextField(Field):
         if all((self.is_valid(e) for e in other)):
             csv_values = ', '.join( (''.join(("'", str(e), "'")) for e in other) )
             
-            return Criterion(self.name, 'IN', ''.join(('(', csv_values, ')')))
+            return Criterion(self.name, SQLiteAPI.IN, ''.join(('(', csv_values, ')')))
 
 
 class NumericField(Field):
     
     def __eq__(self, other):
         if self.is_valid(other):
-            return Criterion(self.name, '=', other)
+            return Criterion(self.name, SQLiteAPI.EQ, other)
 
     def __ne__(self, other):
         if self.is_valid(other):
-            return Criterion(self.name, '!=', other)
+            return Criterion(self.name, SQLiteAPI.NE, other)
 
     def __lt__(self, other):
         if self.is_valid(other):
-            return Criterion(self.name, '<', other)
+            return Criterion(self.name, SQLiteAPI.LT, other)
 
     def __le__(self, other):
         if self.is_valid(other): 
-            return Criterion(self.name, '<=', other)
+            return Criterion(self.name, SQLiteAPI.LE, other)
 
     def __gt__(self, other):
         if self.is_valid(other):
-            return Criterion(self.name, '>', other)
+            return Criterion(self.name, SQLiteAPI.GT, other)
 
     def __ge__(self, other):
         if self.is_valid(other):
-            return Criterion(self.name, '>=', other)
+            return Criterion(self.name, SQLiteAPI.GE, other)
     
     def __lshift__(self, other):
         """IN operator."""
         if all((self.is_valid(e) for e in other)):
             csv_values = ', '.join((str(e) for e in other))
             
-            return Criterion(self.name, 'IN', ''.join(('(', csv_values, ')')))
+            return Criterion(self.name, SQLiteAPI.IN, ''.join(('(', csv_values, ')')))
 
 
 class IntegerField(NumericField):
     internal_type = int    
-    sqlite_datatype = 'INTEGER' 
+    sqlite_datatype = SQLiteAPI.INTEGER
 
 
 class FloatField(NumericField):
     internal_type = float
-    sqlite_datatype = 'REAL'
+    sqlite_datatype = SQLiteAPI.REAL
 
 
 class PrimaryKeyField(IntegerField): 
@@ -415,8 +450,8 @@ class PrimaryKeyField(IntegerField):
        kwargs.update(required=False)
        super().__init__(**kwargs)
     
-    def _to_sql(self):
-        return super()._to_sql() + 'PRIMARY KEY AUTOINCREMENT'
+    def sql(self):
+        return super().sql() + [SQLiteAPI.PK, SQLiteAPI.AUTOINCREMENT]
 
      
 class ForeignKeyField(IntegerField):
@@ -462,7 +497,7 @@ class Model(metaclass=BaseModel):
         for fieldname, value in self._values.items():
             if getattr(self.__class__, fieldname).required and value is None:
                 raise AttributeError('<{}> "{}" field is required: you need to provide a value.'.format(self.__class__.__name__, fieldname))
-
+    
     def save(self):
         if self.pk is None:
             values = {field: value for field, value in self._values.items() if field != 'pk'}
@@ -499,21 +534,19 @@ class Database:
         
         return last_row_id
     
-    def select(self, query):
+    def select(self, tables, fields=None, where=None, count=None, offset=None):
+        query = SQLiteAPI.select(tables, fields, where, count, offset)
+        
         with closing(self._connection.cursor()) as cursor:
             return cursor.execute(query).fetchall()
 
     def create_table(self, model_class):
-         
         fields = [
-            getattr(model_class, fieldname)._to_sql()
+            ' '.join(getattr(model_class, fieldname).sql())
             for fieldname in model_class._fieldnames
         ]
-
-        query = 'CREATE TABLE IF NOT EXISTS {table_name} ({columns})'.format(
-            table_name=model_class.__name__.lower(),
-            columns=', '.join(fields)
-        )
+        
+        query = SQLiteAPI.create_table(model_class.__name__, fields)
 
         with closing(self._connection.cursor()) as cursor:
             cursor.execute(query) 
@@ -526,5 +559,4 @@ class Database:
                 self.create_table(model_class)
         except TypeError:
             raise TypeError('{arg} is not a valid Model subclass.'.format(arg=model_class.__name__))
-
 
