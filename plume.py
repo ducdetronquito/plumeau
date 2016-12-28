@@ -5,7 +5,6 @@ import sqlite3
 
 """
 To do:
-    - Add CREATE TABLE and INSERT INTO into SQLiteAPI
     - Handle ORDER BY
     - Handle query operations (Count, Sum)
     - Add tests all classes
@@ -18,8 +17,9 @@ class SQLiteAPI:
     AUTOINCREMENT = 'AUTOINCREMENT'
     CREATE = 'CREATE TABLE '
     DEFAULT = 'DEFAULT '
-    IF_NOT_EXISTS = 'IF NOT EXISTS '
     FROM = ' FROM '
+    IF_NOT_EXISTS = 'IF NOT EXISTS '
+    INSERT = 'INSERT INTO'
     INTEGER = 'INTEGER'
     LIMIT = ' LIMIT '
     NOT_NULL = 'NOT NULL'
@@ -30,6 +30,7 @@ class SQLiteAPI:
     SELECT = 'SELECT '
     TEXT = 'TEXT'
     UNIQUE = 'UNIQUE '
+    VALUES = 'VALUES'
     WHERE = ' WHERE '
     
     # Query Operators
@@ -46,21 +47,30 @@ class SQLiteAPI:
     def create_table(cls, name, fields):
         query = [
             SQLiteAPI.CREATE, SQLiteAPI.IF_NOT_EXISTS, name.lower(), 
-            '(', ', '.join(fields), ')'
+            SQLiteAPI.to_csv(fields, bracket=True),
         ]
         
         return ''.join(query)
+    
+    @classmethod
+    def insert_into(cls, table_name, field_names):
+        query = [
+            SQLiteAPI.INSERT, table_name.lower(), SQLiteAPI.to_csv(field_names, bracket=True),
+            SQLiteAPI.VALUES, SQLiteAPI.to_csv(['?'] * len(field_names), bracket=True)
+        ]
+        
+        return ' '.join(query)
 
     @classmethod
     def select(cls, tables, fields=None, where=None, count=None, offset=None):
         query = []
         
         query.extend((
-            SQLiteAPI.SELECT, SQLiteAPI.to_csv(fields or '*'),
+            SQLiteAPI.SELECT, SQLiteAPI.to_csv(fields or '*').lower(),
         ))
         
         query.extend((
-            SQLiteAPI.FROM, SQLiteAPI.to_csv(tables),
+            SQLiteAPI.FROM, SQLiteAPI.to_csv(tables).lower(),
         ))
         
         if where is not None:
@@ -74,14 +84,18 @@ class SQLiteAPI:
             ))
         
         return ''.join(query)
-        
+    
     @staticmethod
-    def to_csv(values):
+    def to_csv(values, bracket=False):
         """Convert a string value or a sequence of string values into a coma-separated string."""
         try:
-            return values.lower()
+            values = values.split()
         except AttributeError:
-            return ', '.join((v.lower() for v in values))
+            pass
+            
+        csv = ', '.join(values)
+        
+        return '(' + csv + ')' if bracket else csv
 
 
 class Clause(deque):
@@ -256,19 +270,17 @@ class Manager:
 
     def create(self, **kwargs):
         """Return an instance of the related model.""" 
-        values = [(fieldname, kwargs[fieldname]) for fieldname in self._model._fieldnames if fieldname in kwargs]
-        query = 'INSERT INTO {table_name}({fieldnames}) VALUES ({placeholders})'.format(
-            table_name=self._model.__name__.lower(),
-            fieldnames=', '.join([value[0] for value in values]),
-            placeholders=('?,'*len(values))[:-1]
-        )
-        vals = tuple([value[1] for value in values])
+        field_names = [fieldname for fieldname in self._model._fieldnames if fieldname in kwargs]
+        values = [kwargs[fieldname] for fieldname in self._model._fieldnames if fieldname in kwargs]
         
-        last_row_id = self._model._db.insert_into(query, vals)
-        values.append(('pk',  last_row_id))
-        kwargs =  {field: value for field, value in values}
+        query = SQLiteAPI.insert_into(self._model.__name__, field_names)
         
-        return self._model(**kwargs) 
+        last_row_id = self._model._db.insert_into(query, values)
+        kwargs =  {field: value for field, value in zip(field_names, values)}
+        instance = self._model(**kwargs)
+        instance.pk = last_row_id
+        
+        return instance
 
     def filter(self, *args):
         return QuerySet(self._model).filter(*args)
@@ -396,9 +408,8 @@ class TextField(Field):
     def __lshift__(self, other):
         """IN operator."""
         if all((self.is_valid(e) for e in other)):
-            csv_values = ', '.join( (''.join(("'", str(e), "'")) for e in other) )
-            
-            return Criterion(self.name, SQLiteAPI.IN, ''.join(('(', csv_values, ')')))
+            values = (''.join(("'", str(e), "'")) for e in other)
+            return Criterion(self.name, SQLiteAPI.IN, SQLiteAPI.to_csv(values, bracket=True))
 
 
 class NumericField(Field):
@@ -430,9 +441,8 @@ class NumericField(Field):
     def __lshift__(self, other):
         """IN operator."""
         if all((self.is_valid(e) for e in other)):
-            csv_values = ', '.join((str(e) for e in other))
-            
-            return Criterion(self.name, SQLiteAPI.IN, ''.join(('(', csv_values, ')')))
+            values = (str(e) for e in other)
+            return Criterion(self.name, SQLiteAPI.IN, SQLiteAPI.to_csv(values, bracket=True))
 
 
 class IntegerField(NumericField):
