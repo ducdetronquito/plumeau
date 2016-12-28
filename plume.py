@@ -13,34 +13,34 @@ To do:
 """
 
 class SQLiteAPI:
-    AND = ' AND '
-    AUTOINCREMENT = 'AUTOINCREMENT'
-    CREATE = 'CREATE TABLE '
-    DEFAULT = 'DEFAULT '
-    FROM = ' FROM '
-    IF_NOT_EXISTS = 'IF NOT EXISTS '
-    INSERT = 'INSERT INTO'
-    INTEGER = 'INTEGER'
-    LIMIT = ' LIMIT '
-    NOT_NULL = 'NOT NULL'
-    OFFSET = ' OFFSET '
-    OR = ' OR '
-    PK = 'PRIMARY KEY'
-    REAL = 'REAL'
-    SELECT = 'SELECT '
-    TEXT = 'TEXT'
-    UNIQUE = 'UNIQUE '
-    VALUES = 'VALUES'
-    WHERE = ' WHERE '
+    AND = "AND"
+    AUTOINCREMENT = "AUTOINCREMENT"
+    CREATE = "CREATE TABLE "
+    DEFAULT = "DEFAULT "
+    FROM = " FROM "
+    IF_NOT_EXISTS = "IF NOT EXISTS "
+    INSERT = "INSERT INTO"
+    INTEGER = "INTEGER"
+    LIMIT = " LIMIT "
+    NOT_NULL = "NOT NULL"
+    OFFSET = " OFFSET "
+    OR = "OR"
+    PK = "PRIMARY KEY"
+    REAL = "REAL"
+    SELECT = "SELECT "
+    TEXT = "TEXT"
+    UNIQUE = "UNIQUE "
+    VALUES = "VALUES"
+    WHERE = " WHERE "
     
     # Query Operators
-    EQ = '='
-    GE = '>='
-    GT = '>'
-    IN = 'IN'
-    LE = '<='
-    LT = '<'
-    NE = '!='
+    EQ = "="
+    GE = ">="
+    GT = ">"
+    IN = "IN"
+    LE = "<="
+    LT = "<"
+    NE = "!="
 
 
     @classmethod
@@ -50,23 +50,23 @@ class SQLiteAPI:
             SQLiteAPI.to_csv(fields, bracket=True),
         ]
         
-        return ''.join(query)
+        return "".join(query)
     
     @classmethod
     def insert_into(cls, table_name, field_names):
         query = [
             SQLiteAPI.INSERT, table_name.lower(), SQLiteAPI.to_csv(field_names, bracket=True),
-            SQLiteAPI.VALUES, SQLiteAPI.to_csv(['?'] * len(field_names), bracket=True)
+            SQLiteAPI.VALUES, SQLiteAPI.to_csv(["?"] * len(field_names), bracket=True)
         ]
         
-        return ' '.join(query)
+        return " ".join(query)
 
     @classmethod
     def select(cls, tables, fields=None, where=None, count=None, offset=None):
         query = []
         
         query.extend((
-            SQLiteAPI.SELECT, SQLiteAPI.to_csv(fields or '*').lower(),
+            SQLiteAPI.SELECT, SQLiteAPI.to_csv(fields or "*").lower(),
         ))
         
         query.extend((
@@ -93,9 +93,9 @@ class SQLiteAPI:
         except AttributeError:
             pass
             
-        csv = ', '.join(values)
+        csv = ", ".join(values)
         
-        return '(' + csv + ')' if bracket else csv
+        return "(" + csv + ")" if bracket else csv
 
 
 class Clause(deque):
@@ -105,18 +105,18 @@ class Clause(deque):
             self.append(value)
     
     def __and__(self, other):
-        clause = ''.join((str(other), SQLiteAPI.AND)) if len(self) else str(other)
+        clause = " ".join((str(other), SQLiteAPI.AND)) if len(self) else str(other)
             
         self.appendleft(clause)
         return self
     
     def __or__(self, other):
-        self.appendleft('(')
-        self.append(''.join((SQLiteAPI.OR, str(other), ')')))
+        self.appendleft("(")
+        self.append(" ".join((SQLiteAPI.OR, str(other), ")")))
         return self
         
     def __str__(self):
-        return ''.join((e for e in self))
+        return " ".join((e for e in self))
 
 
 class Criterion:
@@ -127,13 +127,13 @@ class Criterion:
         self.value = value
 
     def __str__(self):
-        return ' '.join((self.field, self.operator, str(self.value)))
+        return " ".join((self.field, self.operator, str(self.value)))
         
     def __and__(self, other):
-        return Clause(''.join((str(self), SQLiteAPI.AND, str(other))))
+        return Clause(" ".join((str(self), SQLiteAPI.AND, str(other))))
 
     def __or__(self, other):
-        return Clause(''.join(( '(', str(self), SQLiteAPI.OR, str(other), ')')))
+        return Clause(" ".join(( "(", str(self), SQLiteAPI.OR, str(other), ")")))
 
 
 class QuerySet:
@@ -153,9 +153,9 @@ class QuerySet:
         self._offset = None
     
     def __str__(self):
-        return ''.join((
-            '(', SQLiteAPI.select(
-                self._tables, self._fields, self._clause, self._count, self._offset), ')'
+        return "".join((
+            "(", SQLiteAPI.select(
+                self._tables, self._fields, self._clause, self._count, self._offset), ")"
         ))
 
     def filter(self, *args):
@@ -299,7 +299,7 @@ class BaseModel(type):
         fieldnames = []
         # Collect all field names from the base classes.
         for base in bases:
-            fieldnames.extend(getattr(base, '_fieldnames', []))
+            fieldnames.extend(getattr(base, "_fieldnames", []))
 
         related_fields = []
         for attr_name, attr_value in attrs.items():
@@ -312,13 +312,13 @@ class BaseModel(type):
                 related_fields.append((attr_name, attr_value))
         
         # Add the list of field names as attribute of the Model class.
-        attrs['_fieldnames'] = fieldnames 
+        attrs["_fieldnames"] = fieldnames 
        
         # Create the new class.
         new_class = super().__new__(cls, clsname, bases, attrs)
         
         #Add a Manager instance as an attribute of the Model class.
-        setattr(new_class, 'objects', Manager(new_class))
+        setattr(new_class, "objects", Manager(new_class))
        
         # Add a Manager to each related Model.
         for attr_name, attr_value in related_fields:
@@ -398,17 +398,17 @@ class TextField(Field):
     
     def __eq__(self, other):
         if self.is_valid(other):
-            return Criterion(self.name, SQLiteAPI.EQ, ''.join(("'", other, "'")))
+            return Criterion(self.name, SQLiteAPI.EQ, "".join(("'", other, "'")))
 
     def __ne__(self, other):
         if self.is_valid(other):
-            return Criterion(self.name, SQLiteAPI.NE, ''.join(("'", other, "'")))
+            return Criterion(self.name, SQLiteAPI.NE, "".join(("'", other, "'")))
 
 
     def __lshift__(self, other):
         """IN operator."""
         if all((self.is_valid(e) for e in other)):
-            values = (''.join(("'", str(e), "'")) for e in other)
+            values = ("".join(("'", str(e), "'")) for e in other)
             return Criterion(self.name, SQLiteAPI.IN, SQLiteAPI.to_csv(values, bracket=True))
 
 
@@ -479,7 +479,7 @@ class ForeignKeyField(IntegerField):
     def is_valid(self, value):
         if not isinstance(value, self.related_model):
             raise TypeError(
-                '{value} is not an instance of {class_name}'.format(
+                "{value} is not an instance of {class_name}".format(
                     value=str(value),
                     class_name=self.related_model.__name__))
         
@@ -487,7 +487,7 @@ class ForeignKeyField(IntegerField):
 
     
     def _to_sql(self):
-        return super._to_sql() + 'REFERENCES' + self.related_model.__name__.lower()
+        return super._to_sql() + "REFERENCES" + self.related_model.__name__.lower()
 
 
 class Model(metaclass=BaseModel):
@@ -502,15 +502,15 @@ class Model(metaclass=BaseModel):
             if hasattr(self, attr_name):
                 setattr(self, attr_name, attr_value)
             else:
-                raise AttributeError('<{}> model has no field "{}".'.format(self.__class__.__name__, attr_name))
+                raise AttributeError("<{}> model has no field '{}'.".format(self.__class__.__name__, attr_name))
 
         for fieldname, value in self._values.items():
             if getattr(self.__class__, fieldname).required and value is None:
-                raise AttributeError('<{}> "{}" field is required: you need to provide a value.'.format(self.__class__.__name__, fieldname))
+                raise AttributeError("<{}> '{}' field is required: you need to provide a value.".format(self.__class__.__name__, fieldname))
     
     def save(self):
         if self.pk is None:
-            values = {field: value for field, value in self._values.items() if field != 'pk'}
+            values = {field: value for field, value in self._values.items() if field != "pk"}
             self.__class__.objects.create(**values)
         else:
             self.__class__.objects.update(User.pk == self.pk, **self._values)
@@ -568,5 +568,5 @@ class Database:
                 model_class._db = self
                 self.create_table(model_class)
         except TypeError:
-            raise TypeError('{arg} is not a valid Model subclass.'.format(arg=model_class.__name__))
+            raise TypeError("{arg} is not a valid Model subclass.".format(arg=model_class.__name__))
 

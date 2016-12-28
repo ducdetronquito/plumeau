@@ -10,7 +10,7 @@ class ClauseTests(TestCase):
         clause = (Pokemon.name == 'Charamander') | (Pokemon.name == 'Bulbasaur')
         
         self.assertEqual(
-            "(name = 'Charamander' OR name = 'Bulbasaur')",
+            "( name = 'Charamander' OR name = 'Bulbasaur' )",
             str(clause),
         )
         
@@ -43,7 +43,7 @@ class ClauseTests(TestCase):
         )
         
         self.assertEqual(
-            "(name = 'Charamander' OR name = 'Bulbasaur' AND level > 18)",
+            "( name = 'Charamander' OR name = 'Bulbasaur' AND level > 18 )",
             str(clause),
         )
 
@@ -54,6 +54,6 @@ class ClauseTests(TestCase):
         )
 
         self.assertEqual(
-            "level > 18 AND (name = 'Charamander' OR name = 'Bulbasaur')",
+            "level > 18 AND ( name = 'Charamander' OR name = 'Bulbasaur' )",
             str(clause),
         )
