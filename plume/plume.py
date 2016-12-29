@@ -1,4 +1,4 @@
-from collections import deque
+from collections import deque, namedtuple
 from contextlib import closing
 import sqlite3
 
@@ -284,7 +284,7 @@ class Manager:
         kwargs =  {field: value for field, value in zip(field_names, values)}
         instance = self._model(**kwargs)
         instance.pk = last_row_id
-        
+
         return instance
 
     def filter(self, *args):
@@ -318,7 +318,10 @@ class BaseModel(type):
         
         # Add the list of field names as attribute of the Model class.
         attrs['_fieldnames'] = fieldnames 
-       
+        
+        # Add instance factory class
+        attrs['_factory'] = namedtuple('InstanceFactory', fieldnames)
+        
         # Create the new class.
         new_class = super().__new__(cls, clsname, bases, attrs)
         
@@ -365,7 +368,7 @@ class Field(BaseField):
         is returned.
         """
         if instance is not None:
-            return instance._values[self.name]
+            return getattr(instance._values, self.name)
         else:
             return self
 
@@ -380,7 +383,7 @@ class Field(BaseField):
         The setter is only accessed through a model instance,
         """
         if self.is_valid(value):
-            instance._values[self.name] = value
+            instance._values._replace(**{self.name: value})
 
     def sql(self):
         field_definition = [self.name, self.sqlite_datatype]
@@ -501,8 +504,15 @@ class Model(metaclass=BaseModel):
 
     def __init__(self, **kwargs):
         # Each value for the current instance is stored in a hidden dictionary.
-        self._values = { fieldname: None for fieldname in self._fieldnames }
+        ## self._values = { fieldname: None for fieldname in self._fieldnames }
         
+        for fieldname in self._fieldnames:
+            if getattr(self.__class__, fieldname).required and fieldname not in kwargs:
+                raise AttributeError("<{}> '{}' field is required: you need to provide a value.".format(self.__class__.__name__, fieldname))
+        
+        kwargs.setdefault('pk', None)
+        self._values = self._factory(**kwargs)
+        """
         for attr_name, attr_value in kwargs.items():
             if hasattr(self, attr_name):
                 setattr(self, attr_name, attr_value)
@@ -512,14 +522,8 @@ class Model(metaclass=BaseModel):
         for fieldname, value in self._values.items():
             if getattr(self.__class__, fieldname).required and value is None:
                 raise AttributeError("<{}> '{}' field is required: you need to provide a value.".format(self.__class__.__name__, fieldname))
-    
-    def save(self):
-        if self.pk is None:
-            values = {field: value for field, value in self._values.items() if field != "pk"}
-            self.__class__.objects.create(**values)
-        else:
-            self.__class__.objects.update(User.pk == self.pk, **self._values)
-    
+        """
+
     def __str__(self):
         return '{model}<{values}>'.format(
             model=self.__class__.__name__,
@@ -527,10 +531,7 @@ class Model(metaclass=BaseModel):
         )
         
     def __eq__(self, other):
-        return (
-            len(self._values) == len(other._values) and
-            all(other._values[field] == value for field, value in self._values.items())
-        )
+        return self._values == other._values
 
 
 class Database:

@@ -3,3 +3,4 @@ plume.egg-info/*
 .cache/*
 *.pyc
 *.db
+size_test.py
