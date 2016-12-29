@@ -1,5 +1,5 @@
 from plume import Database, Model
-from tests.utils import DB_NAME, Pokemon, Trainer
+from utils import DB_NAME, Pokemon, Trainer
 
 from contextlib import closing
 import os

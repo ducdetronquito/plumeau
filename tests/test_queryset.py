@@ -1,5 +1,5 @@
 from plume import *
-from tests.utils import DB_NAME, Trainer
+from utils import DB_NAME, Trainer
 
 import pytest
 

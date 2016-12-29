@@ -1,5 +1,5 @@
 import plume
-from tests.utils import Pokemon
+from utils import Pokemon
 
 import pytest
 
