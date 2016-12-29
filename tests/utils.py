@@ -1,9 +1,5 @@
 from plume import Database, IntegerField, Model, TextField
 
-import os
-from sys import modules
-import unittest
-
 DB_NAME = ':memory:'
 
 class Pokemon(Model):
