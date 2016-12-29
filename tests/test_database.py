@@ -3,12 +3,12 @@ from tests.utils import DB_NAME, Pokemon, Trainer
 
 from contextlib import closing
 import os
-from unittest import TestCase
+import pytest
 
 
-class DatabaseAPITests(TestCase):
+class TestDatabaseAPI:
 
-    def setUp(self):
+    def setup_method(self):
         self.db = Database(DB_NAME)
     
     def table_exists(self, model):
@@ -24,37 +24,37 @@ class DatabaseAPITests(TestCase):
             return query[0][0]
 
     def test_register_a_custom_model(self):
-        self.assertFalse(self.table_exists(Trainer))
+        assert self.table_exists(Trainer) == False
         self.db.register(Trainer)
-        self.assertTrue(self.table_exists(Trainer))
+        assert self.table_exists(Trainer) == True
 
     def test_register_a_non_custom_model(self):
         # A error in table creation must raise an exception an must not make any change in the database.
-        self.assertEqual(self.count_tables(), 0)
+        assert self.count_tables() == 0
         
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.db.register(object)
         
-        self.assertEqual(self.count_tables(), 0)
+        assert self.count_tables() == 0
 
     def test_register_several_custom_models(self):
-        self.assertEqual(self.count_tables(), 0)
+        assert self.count_tables() == 0
         self.db.register(Trainer, Pokemon)
-        self.assertTrue(self.table_exists(Trainer))
-        self.assertTrue(self.table_exists(Pokemon))
+        assert self.table_exists(Trainer) == True
+        assert self.table_exists(Pokemon) == True
         
     def test_store_a_database_reference_into_model_when_registered(self):
         self.db.register(Trainer)
         try:
             Trainer._db
         except AttributeError:
-            self.fail()
+            pytest.fail()
             
     def test_no_database_reference_in_unregistered_model(self):
         class CustomModel(Model):
             pass
         
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             CustomModel._db
 
     def test_register_an_existing_table(self):
@@ -62,7 +62,7 @@ class DatabaseAPITests(TestCase):
         try:
             self.db.register(Trainer)
         except:
-            self.fail()
+            pytest.fail()
         
     def test_all_model_fields_match_table_fields(self):
         self.db.register(Trainer)
@@ -71,11 +71,12 @@ class DatabaseAPITests(TestCase):
             self.db._connection.execute('PRAGMA table_info(trainer)').fetchall()
         ]
         
-        self.assertEqual(len(db_fields), 3)
+        assert len(db_fields) == 3
+
         for model_field in ['pk', 'name', 'age']:
-            self.assertIn(model_field, db_fields)
+            assert model_field in db_fields
             
-    def tearDown(self):
+    def teardown_method(self):
         try:
             os.remove(DB_NAME)
         except:
