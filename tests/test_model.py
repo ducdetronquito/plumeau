@@ -1,5 +1,7 @@
 from plume.plume import Manager, Model
 
+from utils import Trainer
+
 import pytest
 
 
@@ -29,4 +31,17 @@ class TestModel:
         m1 = Model(pk=1)
         m2 = Model(pk=2)
         assert m1 != m2
+        
+    def test_model_is_sloted(self):
+        m1 = Model(pk=1)
+        
+        with pytest.raises(AttributeError):
+            m1.__dict__
+    
+    def test_custom_model_is_sloted(self):
+        sacha = Trainer(name='Sacha', age=42)
+        
+        with pytest.raises(AttributeError):
+            sacha.__dict__
+
 

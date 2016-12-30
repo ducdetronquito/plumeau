@@ -322,6 +322,9 @@ class BaseModel(type):
         # Add instance factory class
         attrs['_factory'] = namedtuple('InstanceFactory', fieldnames)
         
+        # Slots Model and custom Model instances
+        attrs['__slots__'] = ('_values',)
+        
         # Create the new class.
         new_class = super().__new__(cls, clsname, bases, attrs)
         
@@ -512,17 +515,6 @@ class Model(metaclass=BaseModel):
         
         kwargs.setdefault('pk', None)
         self._values = self._factory(**kwargs)
-        """
-        for attr_name, attr_value in kwargs.items():
-            if hasattr(self, attr_name):
-                setattr(self, attr_name, attr_value)
-            else:
-                raise AttributeError("<{}> model has no field '{}'.".format(self.__class__.__name__, attr_name))
-
-        for fieldname, value in self._values.items():
-            if getattr(self.__class__, fieldname).required and value is None:
-                raise AttributeError("<{}> '{}' field is required: you need to provide a value.".format(self.__class__.__name__, fieldname))
-        """
 
     def __str__(self):
         return '{model}<{values}>'.format(
