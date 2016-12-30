@@ -1,4 +1,5 @@
 import plume
+from plume.plume import Clause
 from utils import Pokemon
 
 import pytest
@@ -43,3 +44,7 @@ class TestClause:
         )
         expected = "level > 18 AND ( name = 'Charamander' OR name = 'Bulbasaur' )"
         assert result == expected
+        
+    def test_is_slotted(self):
+        with pytest.raises(AttributeError):
+            Clause().__dict__

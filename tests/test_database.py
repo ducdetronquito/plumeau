@@ -76,6 +76,10 @@ class TestDatabaseAPI:
         for model_field in ['pk', 'name', 'age']:
             assert model_field in db_fields
             
+    def test_is_slotted(self):
+        with pytest.raises(AttributeError):
+            self.db.__dict__
+            
     def teardown_method(self):
         try:
             os.remove(DB_NAME)

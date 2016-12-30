@@ -104,7 +104,8 @@ class SQLiteAPI:
 
 
 class Clause(deque):
-    
+    __slots__ = ()
+
     def __init__(self, value=None):
         if value is not None:
             self.append(value)
@@ -125,6 +126,7 @@ class Clause(deque):
 
 
 class Criterion:
+    __slots__= ('field', 'operator', 'value')
     
     def __init__(self, field, operator, value):
         self.field = field
@@ -148,6 +150,7 @@ class QuerySet:
     clause. The user is allowed to add dynamically several criteria on a QuerySet. The QuerySet only
     hit the database when it is iterated over or sliced.
     """
+    __slots__ = ('_model', '_tables', '_fields', '_clause', '_count', '_offset')
     
     def __init__(self, model):
         self._model = model
@@ -263,10 +266,10 @@ class QuerySet:
 
 
 class Manager:
-
+    __slots__ = ('_model',)
+    
     def __init__(self, model):
         self._model = model
-        self._queryset = None
 
     def __get__(self, instance, owner):
         # A Model Manager is only accessible as a class attribute.
@@ -292,7 +295,8 @@ class Manager:
 
 
 class RelatedManager(Manager):
-    
+    __slots__ = ()
+
     def __get__(self, instance, owner):
         # A RelatedManager is only accessible as an instance attribute.
         if instance is not None:
@@ -339,6 +343,7 @@ class BaseModel(type):
 
 
 class BaseField:
+    __slots__ = ('value', 'name', 'required', 'unique', 'default')
     
     def __init__(self, required=True, unique=False, default=None):
         self.value = None
@@ -358,7 +363,8 @@ class BaseField:
         return True
 
 
-class Field(BaseField): 
+class Field(BaseField):
+    __slots__ = ()
     internal_type = None
     sqlite_datatype = None
 
@@ -404,6 +410,7 @@ class Field(BaseField):
     
 
 class TextField(Field):
+    __slots__ = ()
     internal_type = str
     sqlite_datatype = SQLiteAPI.TEXT
     
@@ -424,7 +431,8 @@ class TextField(Field):
 
 
 class NumericField(Field):
-    
+    __slots__ = ()
+
     def __eq__(self, other):
         if self.is_valid(other):
             return Criterion(self.name, SQLiteAPI.EQ, other)
@@ -457,16 +465,20 @@ class NumericField(Field):
 
 
 class IntegerField(NumericField):
+    __slots__ = ()
     internal_type = int    
     sqlite_datatype = SQLiteAPI.INTEGER
 
 
 class FloatField(NumericField):
+    __slots__ = ()
     internal_type = float
     sqlite_datatype = SQLiteAPI.REAL
 
 
 class PrimaryKeyField(IntegerField): 
+    __slots__ = ()
+    
     def __init__(self, **kwargs):
        kwargs.update(required=False)
        super().__init__(**kwargs)
@@ -476,6 +488,7 @@ class PrimaryKeyField(IntegerField):
 
      
 class ForeignKeyField(IntegerField):
+    __slots__ = ()
 
     def __init__(self, related_model, related_field):
         super().__init__() 
@@ -502,7 +515,6 @@ class ForeignKeyField(IntegerField):
 
 
 class Model(metaclass=BaseModel):
-   
     pk = PrimaryKeyField()
 
     def __init__(self, **kwargs):
@@ -527,6 +539,7 @@ class Model(metaclass=BaseModel):
 
 
 class Database:
+    __slots__ = ('db_name', '_connection')
 
     def __init__(self, db_name):
         self.db_name = db_name

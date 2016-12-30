@@ -1,4 +1,5 @@
 from plume import *
+from plume.plume import QuerySet
 from utils import DB_NAME, Trainer
 
 import pytest
@@ -41,6 +42,10 @@ class TestQuerySetAPI(Base):
         result = str(Trainer.objects.filter(Trainer.age > 18, Trainer.name != 'Giovanni'))
         expected = "(SELECT * FROM trainer WHERE name != 'Giovanni' AND age > 18)"
         assert result == expected
+        
+    def test_is_slotted(self):
+        with pytest.raises(AttributeError):
+            QuerySet(Model).__dict__
             
 
 class TestQuerySetSlice(Base):
