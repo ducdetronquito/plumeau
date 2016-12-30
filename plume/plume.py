@@ -519,7 +519,6 @@ class Model(metaclass=BaseModel):
 
     def __init__(self, **kwargs):
         # Each value for the current instance is stored in a hidden dictionary.
-        ## self._values = { fieldname: None for fieldname in self._fieldnames }
         
         for fieldname in self._fieldnames:
             if getattr(self.__class__, fieldname).required and fieldname not in kwargs:

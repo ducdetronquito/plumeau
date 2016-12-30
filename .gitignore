@@ -1,6 +1,7 @@
-__pycache__/*
-plume.egg-info/*
 .cache/*
-*.pyc
+__pycache__/*
+env/*
+plume.egg-info/*
 *.db
+*.pyc
 size_test.py
