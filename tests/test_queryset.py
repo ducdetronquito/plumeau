@@ -160,6 +160,24 @@ class TestQuerySetResults(Base):
         
         assert jessie.name == 'Jessie'
         assert jessie.age == 17
+        
+    def test_filter_on_one_field_must_returns_a_list_of_field_values(self):
+        self.add_trainer(['Giovanni', 'James', 'Jessie'])
+        result = list(Trainer.objects.select('name'))
+        expected = ['Giovanni', 'James', 'Jessie']
+        
+        assert result == expected
+    
+    def test_filter_on_several_fields_must_returns_a_list_of_namedtuples(self):
+        self.add_trainer(['Giovanni', 'James', 'Jessie'])
+        result = list(Trainer.objects.select('name', 'age'))
+
+        assert result[0][0] == 'Giovanni'
+        assert result[0][1] == 42
+        assert result[1][0] == 'James'
+        assert result[1][1] == 21
+        assert result[2][0] == 'Jessie'
+        assert result[2][1] == 17
 
     """
     def test_select_from_one_table_with_inner_query(self):

@@ -87,7 +87,6 @@ class SQLiteAPI:
             query.extend((
                 SQLiteAPI.LIMIT, str(count), SQLiteAPI.OFFSET, str(offset),
             ))
-        
         return ' '.join(query)
     
     @staticmethod
@@ -189,6 +188,12 @@ class QuerySet:
 
         return self
         
+    def select(self, *args):
+        # Allow to filter Select-Query on columns.
+        self._fields = args
+
+        return self
+
     def slice(self, count, offset):
         """ Slice a QuerySet without hiting the database."""
         self._count = count
@@ -197,16 +202,26 @@ class QuerySet:
         return self
         
     def __execute(self):
-        """Query the database and returns the result as a list of model instances."""
-        values = self._model._db.select(
+        """Query the database and returns the result."""
+        rows = self._model._db.select(
             self._tables, self._fields, self._clause, self._count, self._offset
         )
         
+        if self._fields is not None:
+            # If several fields are specified, returns a list of tuples,
+            # each containing a value for each field.
+            # If only one field is specified, returns a list of value for that field.
+            if len(self._fields) > 1:
+                return iter(rows)
+                
+            return iter([row[0] for row in rows])
+        
+        # If no field restriction is provided, returns a list of Model instance.
         return iter([
             self._model(**{
-                fieldname: value for fieldname, value in zip(self._model._fieldnames, instance)
+                fieldname: value for fieldname, value in zip(self._model._fieldnames, row)
             })
-            for instance in values
+            for row in rows
         ])
 
     def __iter__(self):
@@ -289,6 +304,9 @@ class Manager:
         instance.pk = last_row_id
 
         return instance
+        
+    def select(self, *args):
+        return QuerySet(self._model).select(*args)
 
     def filter(self, *args):
         return QuerySet(self._model).filter(*args)
