@@ -1,6 +1,6 @@
 from plume import *
 from plume.plume import QuerySet
-from utils import DB_NAME, Trainer
+from utils import DB_NAME, Pokemon, Trainer
 
 import pytest
 
@@ -22,9 +22,27 @@ class Base:
         },
     }
     
+    POKEMONS = {
+        'Kangaskhan': {
+            'name': 'Kangaskhan',
+            'level': 29,
+            'trainer': 1
+        },
+        'Koffing': {
+            'name': 'Koffing',
+            'level': 9,
+            'trainer': 2
+        },
+        'Wobbuffet': {
+            'name': 'Wobbuffet',
+            'age': 19,
+            'trainer': 3
+        },
+    }
+    
     def setup_method(self):
         db = Database(DB_NAME)
-        db.register(Trainer)
+        db.register(Trainer, Pokemon)
     
     def add_trainer(self, names):
         try:
@@ -34,6 +52,15 @@ class Base:
         
         for name in names:
             Trainer.objects.create(**self.TRAINERS[name])
+            
+    def add_pokemon(self, names):
+        try:
+            names = names.split()
+        except:
+            pass
+        
+        for name in names:
+            Pokemon.objects.create(**self.POKEMONS[name])
 
 
 class TestQuerySetAPI(Base):
@@ -179,15 +206,20 @@ class TestQuerySetResults(Base):
         assert result[2][0] == 'Jessie'
         assert result[2][1] == 17
 
-    """
-    def test_select_from_one_table_with_inner_query(self):
-        self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        queryset = Trainer.objects.filter(Trainer.name != 'Giovanni') 
-        queryset.filter(Trainer.age > Trainer.objects.select('age').filter(Trainer.name == 'Jessie'))
-        result = list(queryset)
+    def test_filter_on_table_with_related_field(self):
+        self.add_trainer('Giovanni')
+        self.add_pokemon('Kangaskhan')
+        
+        result = list(Pokemon.objects.filter())
         assert len(result) == 1
         
-        james = result[0]
-        assert james.name == 'James'
-        assert james.age == 21
-    """
+        pokemon = result[0]
+        assert pokemon.name == 'Kangaskhan'
+        assert pokemon.level == 29
+        assert isinstance(result[0].trainer, Trainer) is True
+        
+        trainer = pokemon.trainer
+        assert trainer.name == 'Giovanni'
+        assert trainer.age == 42
+
+

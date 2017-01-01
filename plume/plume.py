@@ -2,7 +2,6 @@ from collections import deque, namedtuple
 from contextlib import closing
 import sqlite3
 
-
 __all__ = [
     'Database', 'Field', 'FloatField', 'IntegerField', 'Model', 'NumericField',
     'PrimaryKeyField', 'TextField',
@@ -13,7 +12,7 @@ class SQLiteAPI:
     # Create table query
     AUTOINCREMENT = 'AUTOINCREMENT'
     CREATE = 'CREATE TABLE'
-    DEFAULT = 'DEFAULT '
+    DEFAULT = 'DEFAULT'
     IF_NOT_EXISTS = 'IF NOT EXISTS'
     INTEGER = 'INTEGER'
     NOT_NULL = 'NOT NULL'
@@ -292,17 +291,19 @@ class Manager:
             return self
 
     def create(self, **kwargs):
-        """Return an instance of the related model.""" 
+        """Return an instance of the related model."""
         field_names = [fieldname for fieldname in self._model._fieldnames if fieldname in kwargs]
         values = [kwargs[fieldname] for fieldname in self._model._fieldnames if fieldname in kwargs]
         
+        values = [value.pk if isinstance(value, Model) else value for value in values]
+                
         query = SQLiteAPI.insert_into(self._model.__name__, field_names)
         
         last_row_id = self._model._db.insert_into(query, values)
         kwargs =  {field: value for field, value in zip(field_names, values)}
+        kwargs['pk'] = last_row_id
         instance = self._model(**kwargs)
-        instance.pk = last_row_id
-
+    
         return instance
         
     def select(self, *args):
@@ -502,17 +503,25 @@ class PrimaryKeyField(IntegerField):
 
      
 class ForeignKeyField(IntegerField):
-    __slots__ = ()
+    __slots__ = ('related_model', 'related_field')
 
     def __init__(self, related_model, related_field):
         super().__init__() 
         self.related_model = related_model
         self.related_field = related_field
         
+    def __get__(self, instance, owner):
+        if instance is not None:
+            related_pk_value = getattr(instance._values, self.name)
+            related_pk_field = getattr(self.related_model, 'pk')
+            return self.related_model.objects.filter(related_pk_field == related_pk_value)[0]
+        else:
+            return self
+
     def __set__(self, instance, value):
         """Store the primary key of a valid related model instance."""
         if self.is_valid(value):
-            instance._values[self.name] = value.pk
+            instance._values._replace(**{self.name: value.pk})
 
     def is_valid(self, value):
         if not isinstance(value, self.related_model):
@@ -524,8 +533,8 @@ class ForeignKeyField(IntegerField):
         return super().is_valid(value.pk)
 
     
-    def _to_sql(self):
-        return super._to_sql() + 'REFERENCES' + self.related_model.__name__.lower()
+    def sql(self):
+        return super().sql() + ['REFERENCES', self.related_model.__name__.lower() + '(pk)']
 
 
 class Model(metaclass=BaseModel):
@@ -544,7 +553,7 @@ class Model(metaclass=BaseModel):
     def __str__(self):
         return '{model}<{values}>'.format(
             model=self.__class__.__name__,
-            values=str(self._values)[1:-1],
+            values=self._values,
         )
         
     def __eq__(self, other):
@@ -557,10 +566,11 @@ class Database:
     def __init__(self, db_name):
         self.db_name = db_name
         self._connection = sqlite3.connect(self.db_name)
+        self._connection.execute('PRAGMA foreign_keys = ON')
    
     def insert_into(self, query, values):
         last_row_id = None
-
+        
         with closing(self._connection.cursor()) as cursor:
             cursor.execute(query, values)
             last_row_id = cursor.lastrowid

@@ -79,6 +79,10 @@ class TestDatabaseAPI:
     def test_is_slotted(self):
         with pytest.raises(AttributeError):
             self.db.__dict__
+    
+    def test_pragma_foreign_key_is_on(self):
+        result = self.db._connection.execute('PRAGMA foreign_keys').fetchone()[0]
+        assert result == 1
             
     def teardown_method(self):
         try:
