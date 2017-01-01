@@ -1,13 +1,6 @@
-from plume.plume import (BaseField, Field, FloatField, IntegerField, PrimaryKeyField, TextField)
+from plume.plume import (Field, FloatField, IntegerField, PrimaryKeyField, TextField)
 
 import pytest
-
-
-class TestBaseField:
-    
-    def test_is_slotted(self):
-        with pytest.raises(AttributeError):
-            BaseField().__dict__
 
 
 class TestField:

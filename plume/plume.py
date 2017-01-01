@@ -331,7 +331,7 @@ class BaseModel(type):
         related_fields = []
         for attr_name, attr_value in attrs.items():
             # Provide to each Field subclass the name of its attribute.
-            if isinstance(attr_value, BaseField):
+            if isinstance(attr_value, Field):
                 attr_value.name = attr_name
                 fieldnames.append(attr_name)
             # Keep track of each RelatedField. 
@@ -360,31 +360,17 @@ class BaseModel(type):
         return new_class
 
 
-class BaseField:
+class Field:
     __slots__ = ('value', 'name', 'required', 'unique', 'default')
-    
+    internal_type = None
+    sqlite_datatype = None
+
     def __init__(self, required=True, unique=False, default=None):
         self.value = None
         self.name = None
         self.required = required
         self.unique = unique
         self.default = default
-
-    def is_valid(self, value):
-        """Return True if the provided value match the internal field."""
-        if value is not None and not isinstance(value, self.internal_type):
-            raise TypeError(
-                "Type of field '{field_name}' must be an instance of {internal_type}.".format(
-                    field_name=self.name, 
-                    internal_type=self.internal_type))
-
-        return True
-
-
-class Field(BaseField):
-    __slots__ = ()
-    internal_type = None
-    sqlite_datatype = None
 
     def __get__(self, instance, owner):
         """
@@ -411,6 +397,16 @@ class Field(BaseField):
         """
         if self.is_valid(value):
             instance._values._replace(**{self.name: value})
+
+    def is_valid(self, value):
+        """Return True if the provided value match the internal field."""
+        if value is not None and not isinstance(value, self.internal_type):
+            raise TypeError(
+                "Type of field '{field_name}' must be an instance of {internal_type}.".format(
+                    field_name=self.name, 
+                    internal_type=self.internal_type))
+
+        return True
 
     def sql(self):
         field_definition = [self.name, self.sqlite_datatype]
