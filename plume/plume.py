@@ -141,7 +141,7 @@ class Criterion:
         return Clause(' '.join(( '(', str(self), SQLiteAPI.OR, str(other), ')')))
 
 
-class QuerySet:
+class SelectQuery:
     """A QuerySet allows to forge a lazy SQL query.
 
     A QuerySet represents a Select-From-Where SQL query, and allow the user to define the WHERE
@@ -307,10 +307,10 @@ class Manager:
         return instance
         
     def select(self, *args):
-        return QuerySet(self._model).select(*args)
+        return SelectQuery(self._model).select(*args)
 
     def filter(self, *args):
-        return QuerySet(self._model).filter(*args)
+        return SelectQuery(self._model).filter(*args)
 
 
 class RelatedManager(Manager):

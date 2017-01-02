@@ -1,5 +1,5 @@
 from plume import *
-from plume.plume import QuerySet
+from plume.plume import SelectQuery
 from utils import DB_NAME, Pokemon, Trainer
 
 import pytest
@@ -63,19 +63,19 @@ class Base:
             Pokemon.objects.create(**self.POKEMONS[name])
 
 
-class TestQuerySetAPI(Base):
+class TestSelectQueryAPI(Base):
     
-    def test_output_queryset_as_string(self):
+    def test_output_selectquery_as_string(self):
         result = str(Trainer.objects.filter(Trainer.age > 18, Trainer.name != 'Giovanni'))
         expected = "(SELECT * FROM trainer WHERE name != 'Giovanni' AND age > 18)"
         assert result == expected
         
     def test_is_slotted(self):
         with pytest.raises(AttributeError):
-            QuerySet(Model).__dict__
+            SelectQuery(Model).__dict__
             
 
-class TestQuerySetSlice(Base):
+class TestSelectQuerySlice(Base):
     
     def test_indexed_access_to_first_element_returns_a_model_instance(self):
         self.add_trainer('Giovanni')
@@ -117,7 +117,7 @@ class TestQuerySetSlice(Base):
         assert trainers[1].age == 21
 
 
-class TestQuerySetResults(Base):
+class TestSelectQueryResults(Base):
     
     def test_select_from_one_table_with_all_fields(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
@@ -167,9 +167,9 @@ class TestQuerySetResults(Base):
         
     def test_select_from_one_table_with_chained_filters(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        queryset = Trainer.objects.filter(Trainer.age > 18) 
-        queryset.filter(Trainer.name != 'Giovanni')
-        result = list(queryset)
+        selectquery = Trainer.objects.filter(Trainer.age > 18) 
+        selectquery.filter(Trainer.name != 'Giovanni')
+        result = list(selectquery)
         assert len(result) == 1
         
         james = result[0]

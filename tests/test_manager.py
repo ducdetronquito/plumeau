@@ -1,4 +1,4 @@
-from plume.plume import Database, Manager, Model, QuerySet
+from plume.plume import Database, Manager, Model, SelectQuery
 from utils import DB_NAME, Pokemon, Trainer
 
 import pytest
@@ -18,13 +18,13 @@ class TestManagerAPI:
             Trainer().objects
             
     def test_filter_returns_a_queryset(self):
-        assert isinstance(Trainer.objects.filter(), QuerySet)
+        assert isinstance(Trainer.objects.filter(), SelectQuery)
         
     def test_filter_handles_several_unnamed_arguments(self):
         Trainer.objects.filter('a', 'b', 'c')
         
     def test_select_returns_a_queryset(self):
-        assert isinstance(Trainer.objects.select(), QuerySet)
+        assert isinstance(Trainer.objects.select(), SelectQuery)
     
     def test_select_handles_several_unnamed_arguments(self):
         Trainer.objects.select('a', 'b', 'c')
