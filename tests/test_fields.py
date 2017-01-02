@@ -57,6 +57,10 @@ class TestFloatField:
         result = field.sql()
         expected = ['field', 'REAL', 'UNIQUE', 'NOT NULL', 'DEFAULT', '0.0']
         assert result == expected
+    
+    def test_default_value_needs_to_be_a_float(self):
+        with pytest.raises(TypeError):
+            field = FloatField(default=42)
         
     def test_allows_equal_operator(self):
         field = FloatField()
@@ -183,6 +187,10 @@ class TestIntegerField:
         expected = ['field', 'INTEGER', 'UNIQUE', 'NOT NULL', 'DEFAULT', '0']
         assert result == expected
         
+    def test_default_value_needs_to_be_an_integer(self):
+        with pytest.raises(TypeError):
+            field = IntegerField(default=6.66)
+        
     def test_allows_equal_operator(self):
         field = IntegerField()
         field.name = 'field' # Automatically done in BaseModel.
@@ -289,6 +297,10 @@ class TestPrimaryKeyField:
         expected = ['field', 'INTEGER', 'PRIMARY KEY', 'AUTOINCREMENT']
         assert result == expected
         
+    def test_default_value_needs_to_be_an_integer(self):
+        with pytest.raises(TypeError):
+            field = PrimaryKeyField(default=6.66)
+        
     
 class TestTextField:
     
@@ -308,7 +320,11 @@ class TestTextField:
         result = field.sql()
         expected = ['field', 'TEXT', 'UNIQUE', 'NOT NULL', 'DEFAULT', 'empty']
         assert result == expected
-        
+
+    def test_default_value_needs_to_be_a_string(self):
+        with pytest.raises(TypeError):
+            field = TextField(default=42)
+
     def test_allows_equal_operator(self):
         field = TextField()
         field.name = 'field' # Automatically done in BaseModel.

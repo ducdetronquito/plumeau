@@ -3,8 +3,8 @@ from contextlib import closing
 import sqlite3
 
 __all__ = [
-    'Database', 'Field', 'FloatField', 'IntegerField', 'Model', 'NumericField',
-    'PrimaryKeyField', 'TextField',
+    'Database', 'Field', 'FloatField', 'ForeignKeyField', 'IntegerField', 'Model',
+    'NumericField', 'PrimaryKeyField', 'TextField',
 ]
 
 
@@ -371,7 +371,10 @@ class Field:
         self.name = None
         self.required = required
         self.unique = unique
-        self.default = default
+        self.default = None
+        
+        if default is not None and self.is_valid(default):
+            self.default = default
 
     def __get__(self, instance, owner):
         """
