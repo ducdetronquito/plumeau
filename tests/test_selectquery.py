@@ -66,7 +66,7 @@ class Base:
 class TestSelectQueryAPI(Base):
     
     def test_output_selectquery_as_string(self):
-        result = str(Trainer.objects.filter(Trainer.age > 18, Trainer.name != 'Giovanni'))
+        result = str(Trainer.objects.where(Trainer.age > 18, Trainer.name != 'Giovanni'))
         expected = "(SELECT * FROM trainer WHERE name != 'Giovanni' AND age > 18)"
         assert result == expected
         
@@ -79,19 +79,19 @@ class TestSelectQuerySlice(Base):
     
     def test_indexed_access_to_first_element_returns_a_model_instance(self):
         self.add_trainer('Giovanni')
-        trainer = Trainer.objects.filter()[0]
+        trainer = Trainer.objects.where()[0]
         assert trainer.name == 'Giovanni'
         assert trainer.age == 42
         
     def test_indexed_access_to_random_element_returns_a_model_instance(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        trainer = Trainer.objects.filter()[2]
+        trainer = Trainer.objects.where()[2]
         assert trainer.name == 'Jessie'
         assert trainer.age == 17
         
     def test_slice_access_with_start_and_stop_value_returns_a_model_instance_list(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        trainers = Trainer.objects.filter()[1:3]
+        trainers = Trainer.objects.where()[1:3]
         assert len(trainers) == 2
         assert trainers[0].name == 'James'
         assert trainers[0].age == 21
@@ -100,7 +100,7 @@ class TestSelectQuerySlice(Base):
         
     def test_slice_access_with_offset_only_returns_a_model_instance_list(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        trainers = Trainer.objects.filter()[1:3]
+        trainers = Trainer.objects.where()[1:3]
         assert len(trainers) == 2
         assert trainers[0].name == 'James'
         assert trainers[0].age == 21
@@ -109,7 +109,7 @@ class TestSelectQuerySlice(Base):
         
     def test_slice_access_with_offset_only_returns_a_pokemon_list(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        trainers = Trainer.objects.filter()[:2]
+        trainers = Trainer.objects.where()[:2]
         assert len(trainers) == 2
         assert trainers[0].name == 'Giovanni'
         assert trainers[0].age == 42
@@ -121,7 +121,7 @@ class TestSelectQueryResults(Base):
     
     def test_select_from_one_table_with_all_fields(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        result = list(Trainer.objects.filter())
+        result = list(Trainer.objects.where())
         
         assert len(result) == 3
         giovanni, james, jessie = result
@@ -137,7 +137,7 @@ class TestSelectQueryResults(Base):
         
     def test_select_from_one_table_with_one_criterion(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        result = list(Trainer.objects.filter(Trainer.age > 18))
+        result = list(Trainer.objects.where(Trainer.age > 18))
         assert len(result) == 2
         
         giovanni, james = result
@@ -149,7 +149,7 @@ class TestSelectQueryResults(Base):
         
     def test_select_from_one_table_with_ANDs_criteria_operator(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        result = list(Trainer.objects.filter((Trainer.age > 18)  & (Trainer.name != 'Giovanni')))
+        result = list(Trainer.objects.where((Trainer.age > 18)  & (Trainer.name != 'Giovanni')))
         assert len(result) == 1
         
         james = result[0]
@@ -158,7 +158,7 @@ class TestSelectQueryResults(Base):
 
     def test_select_from_one_table_with_ANDs_criteria_list(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        result = list(Trainer.objects.filter(Trainer.age > 18, Trainer.name != 'Giovanni'))
+        result = list(Trainer.objects.where(Trainer.age > 18, Trainer.name != 'Giovanni'))
         assert len(result) == 1
         
         james = result[0]
@@ -167,8 +167,8 @@ class TestSelectQueryResults(Base):
         
     def test_select_from_one_table_with_chained_filters(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        selectquery = Trainer.objects.filter(Trainer.age > 18) 
-        selectquery.filter(Trainer.name != 'Giovanni')
+        selectquery = Trainer.objects.where(Trainer.age > 18) 
+        selectquery.where(Trainer.name != 'Giovanni')
         result = list(selectquery)
         assert len(result) == 1
         
@@ -178,7 +178,7 @@ class TestSelectQueryResults(Base):
         
     def test_select_from_one_table_with_in_operator(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        result = list(Trainer.objects.filter(Trainer.age << [17, 21]))
+        result = list(Trainer.objects.where(Trainer.age << [17, 21]))
         assert len(result) == 2
         
         james, jessie = result
@@ -210,7 +210,7 @@ class TestSelectQueryResults(Base):
         self.add_trainer('Giovanni')
         self.add_pokemon('Kangaskhan')
         
-        result = list(Pokemon.objects.filter())
+        result = list(Pokemon.objects.where())
         assert len(result) == 1
         
         pokemon = result[0]

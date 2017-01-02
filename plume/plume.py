@@ -164,7 +164,7 @@ class SelectQuery:
                 self._tables, self._fields, self._clause, self._count, self._offset), ')'
         ))
 
-    def filter(self, *args):
+    def where(self, *args):
         """
         Allow to filter a QuerySet.
         
@@ -309,8 +309,8 @@ class Manager:
     def select(self, *args):
         return SelectQuery(self._model).select(*args)
 
-    def filter(self, *args):
-        return SelectQuery(self._model).filter(*args)
+    def where(self, *args):
+        return SelectQuery(self._model).where(*args)
 
 
 class RelatedManager(Manager):
@@ -525,7 +525,7 @@ class ForeignKeyField(IntegerField):
         if instance is not None:
             related_pk_value = getattr(instance._values, self.name)
             related_pk_field = getattr(self.related_model, 'pk')
-            return self.related_model.objects.filter(related_pk_field == related_pk_value)[0]
+            return self.related_model.objects.where(related_pk_field == related_pk_value)[0]
         else:
             return self
 

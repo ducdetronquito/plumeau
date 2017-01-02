@@ -18,10 +18,10 @@ class TestManagerAPI:
             Trainer().objects
             
     def test_filter_returns_a_queryset(self):
-        assert isinstance(Trainer.objects.filter(), SelectQuery)
+        assert isinstance(Trainer.objects.where(), SelectQuery)
         
     def test_filter_handles_several_unnamed_arguments(self):
-        Trainer.objects.filter('a', 'b', 'c')
+        Trainer.objects.where('a', 'b', 'c')
         
     def test_select_returns_a_queryset(self):
         assert isinstance(Trainer.objects.select(), SelectQuery)
