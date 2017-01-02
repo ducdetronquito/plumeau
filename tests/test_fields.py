@@ -318,7 +318,7 @@ class TestTextField:
         field = TextField(required=True, unique=True, default='empty')
         field.name = 'field'
         result = field.sql()
-        expected = ['field', 'TEXT', 'UNIQUE', 'NOT NULL', 'DEFAULT', 'empty']
+        expected = ['field', 'TEXT', 'UNIQUE', 'NOT NULL', 'DEFAULT', "'empty'"]
         assert result == expected
 
     def test_default_value_needs_to_be_a_string(self):

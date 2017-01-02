@@ -412,7 +412,7 @@ class Field:
 
         return True
 
-    def sql(self):
+    def sql(self, set_default=True):
         field_definition = [self.name, self.sqlite_datatype]
         
         if self.unique:
@@ -421,7 +421,7 @@ class Field:
         if self.required:
             field_definition.append(SQLiteAPI.NOT_NULL)
         
-        if self.default is not None:
+        if set_default and self.default is not None:
             field_definition.extend((SQLiteAPI.DEFAULT, str(self.default)))
 
         return field_definition
@@ -447,6 +447,14 @@ class TextField(Field):
             values = (''.join(("'", str(e), "'")) for e in other)
             return Criterion(self.name, SQLiteAPI.IN, SQLiteAPI.to_csv(values, bracket=True))
 
+    def sql(self):
+        field_representation = super().sql(set_default=False)
+        
+        if self.default is not None:
+            field_representation.extend(
+                (SQLiteAPI.DEFAULT, ''.join(("'", str(self.default), "'")))
+            )
+        return field_representation
 
 class NumericField(Field):
     __slots__ = ()
