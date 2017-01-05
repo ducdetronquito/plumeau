@@ -199,29 +199,6 @@ class SelectQuery:
         self._offset = offset
 
         return self
-        
-    def __execute(self):
-        """Query the database and returns the result."""
-        rows = self._model._db.select(
-            self._tables, self._fields, self._clause, self._count, self._offset
-        )
-        
-        if self._fields is not None:
-            # If several fields are specified, returns a list of tuples,
-            # each containing a value for each field.
-            # If only one field is specified, returns a list of value for that field.
-            if len(self._fields) > 1:
-                return iter(rows)
-                
-            return iter([row[0] for row in rows])
-        
-        # If no field restriction is provided, returns a list of Model instance.
-        return iter([
-            self._model(**{
-                fieldname: value for fieldname, value in zip(self._model._fieldnames, row)
-            })
-            for row in rows
-        ])
 
     def __iter__(self):
         """
@@ -237,7 +214,7 @@ class SelectQuery:
             An Iterator containing a model instance list.
                 ex: Iterator(List[Pokemon])
         """
-        return self.__execute()
+        return iter(self.execute())
     
     def __getitem__(self, key):
         """
@@ -274,10 +251,38 @@ class SelectQuery:
         
         self.slice(count, offset)
             
-        result = self.__execute()
+        result = self.execute()
         
-        return list(result)[0] if direct_access else list(result)
+        return result[0] if direct_access else result
 
+    def _execute(self):
+        """Query the database and returns the result as a list of tuples."""
+        return self._model._db.select(
+            self._tables, self._fields, self._clause, self._count, self._offset
+        )
+
+    def dicts(self, allow_fields_subset=True):
+        """Query the database and returns the result as a list of dict"""
+        fields = self._fields or self._model._fieldnames
+
+        return [
+            {fieldname: value for fieldname, value in zip(fields, row)} 
+            for row in self._execute()
+        ]
+        
+    def execute(self):
+        """Returns a list of Model instances."""
+        return [self._model(**d) for d in self.dicts()]
+    
+    def tuples(self, named=False):
+        """Output a SelectQuery as a list of tuples or namedtuples"""
+        if not named:
+            return self._execute()
+        
+        fields =  self._fields or self._model._fieldnames
+        factory = namedtuple('factory', fields)
+        return [factory._make(row) for row in self._execute()]
+        
 
 class Manager:
     __slots__ = ('_model',)
