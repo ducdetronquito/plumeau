@@ -35,7 +35,7 @@ class Base:
         },
         'Wobbuffet': {
             'name': 'Wobbuffet',
-            'age': 19,
+            'level': 19,
             'trainer': 3
         },
     }
@@ -70,6 +70,16 @@ class TestSelectQueryAPI(Base):
         expected = "(SELECT * FROM trainer WHERE name != 'Giovanni' AND age > 18)"
         assert result == expected
         
+    def test_output_selectquery_with_nested_query(self):
+        self.add_trainer(['Giovanni', 'James', 'Jessie'])
+        self.add_pokemon(['Kangaskhan', 'Koffing', 'Wobbuffet'])
+        
+        trainer_pks = Trainer.objects.select('pk').where(Trainer.name != 'Jessie')
+        pokemons_names = Pokemon.objects.select('name').where(Pokemon.trainer << trainer_pks)
+        
+        assert str(trainer_pks) == "(SELECT pk FROM trainer WHERE name != 'Jessie')"
+        assert str(pokemons_names) == "(SELECT name FROM pokemon WHERE trainer IN (SELECT pk FROM trainer WHERE name != 'Jessie'))"
+
     def test_is_slotted(self):
         with pytest.raises(AttributeError):
             SelectQuery(Model).__dict__
@@ -195,7 +205,7 @@ class TestSelectQueryResults(Base):
         
         assert result == expected
     
-    def test_filter_on_several_fields_must_returns_a_list_of_namedtuples(self):
+    def test_filter_on_several_fields_must_returns_a_list_of_tuples(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
         result = list(Trainer.objects.select('name', 'age'))
 
@@ -222,4 +232,19 @@ class TestSelectQueryResults(Base):
         assert trainer.name == 'Giovanni'
         assert trainer.age == 42
 
+
+    def test_filter_with_nested_query(self):
+        self.add_trainer(['Giovanni', 'James', 'Jessie'])
+        self.add_pokemon(['Kangaskhan', 'Koffing', 'Wobbuffet'])
+        
+        trainer_pks = Trainer.objects.select('pk').where(Trainer.name != 'Jessie')
+        
+        pokemons_names = Pokemon.objects.select('name').where(Pokemon.trainer << trainer_pks)
+        
+        result = list(pokemons_names)
+        
+        assert len(result) == 2
+        assert result[0] == 'Kangaskhan'
+        assert result[1] == 'Koffing'
+        
 
