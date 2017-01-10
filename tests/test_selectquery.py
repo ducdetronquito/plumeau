@@ -200,14 +200,14 @@ class TestSelectQueryResults(Base):
         
     def test_filter_on_one_field_must_returns_a_list_of_field_values(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        result = list(Trainer.objects.select('name'))
-        expected = ['Giovanni', 'James', 'Jessie']
+        result = Trainer.objects.select('name').tuples()
+        expected = [('Giovanni',), ('James',), ('Jessie',)]
         
         assert result == expected
     
     def test_filter_on_several_fields_must_returns_a_list_of_tuples(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        result = list(Trainer.objects.select('name', 'age'))
+        result = Trainer.objects.select('name', 'age').tuples()
 
         assert result[0][0] == 'Giovanni'
         assert result[0][1] == 42
@@ -239,12 +239,10 @@ class TestSelectQueryResults(Base):
         
         trainer_pks = Trainer.objects.select('pk').where(Trainer.name != 'Jessie')
         
-        pokemons_names = Pokemon.objects.select('name').where(Pokemon.trainer << trainer_pks)
-        
-        result = list(pokemons_names)
+        result = Pokemon.objects.select('name').where(Pokemon.trainer << trainer_pks).tuples()
         
         assert len(result) == 2
-        assert result[0] == 'Kangaskhan'
-        assert result[1] == 'Koffing'
+        assert result[0][0] == 'Kangaskhan'
+        assert result[1][0] == 'Koffing'
         
 
