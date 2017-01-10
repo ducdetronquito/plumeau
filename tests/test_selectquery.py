@@ -205,14 +205,14 @@ class TestSelectQueryResults(Base):
 
     def test_filter_on_one_field_must_returns_a_list_of_field_values(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        result = Trainer.objects.select('name').tuples()
+        result = Trainer.objects.select(Trainer.name).tuples()
         expected = [('Giovanni',), ('James',), ('Jessie',)]
 
         assert result == expected
 
     def test_filter_on_several_fields_must_returns_a_list_of_tuples(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        result = Trainer.objects.select('name', 'age').tuples()
+        result = Trainer.objects.select(Trainer.name, Trainer.age).tuples()
 
         assert result[0][0] == 'Giovanni'
         assert result[0][1] == 42
@@ -225,7 +225,7 @@ class TestSelectQueryResults(Base):
         self.add_trainer('Giovanni')
         self.add_pokemon('Kangaskhan')
 
-        result = list(Pokemon.objects.where())
+        result = list(Pokemon.objects.select())
         assert len(result) == 1
 
         pokemon = result[0]
@@ -242,12 +242,13 @@ class TestSelectQueryResults(Base):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
         self.add_pokemon(['Kangaskhan', 'Koffing', 'Wobbuffet'])
 
-        trainer_pks = Trainer.objects.select('pk').where(Trainer.name != 'Jessie')
+        trainer_pks = Trainer.objects.select(Trainer.pk).where(Trainer.name != 'Jessie')
 
-        result = Pokemon.objects.select('name').where(Pokemon.trainer << trainer_pks).tuples()
+        result = Pokemon.objects.select(Pokemon.name).where(Pokemon.trainer << trainer_pks).tuples()
 
         assert len(result) == 2
         assert result[0][0] == 'Kangaskhan'
         assert result[1][0] == 'Koffing'
+
 
 

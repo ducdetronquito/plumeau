@@ -62,35 +62,35 @@ class SQLiteAPI:
 
     @classmethod
     def create_table(cls, name, fields):
-        query = [
-            SQLiteAPI.CREATE, SQLiteAPI.TABLE, SQLiteAPI.IF,
-            SQLiteAPI.invert_operator(SQLiteAPI.EXISTS), name.lower(),
-            SQLiteAPI.to_csv(fields, bracket=True),
+        query = (
+            cls.CREATE, cls.TABLE, cls.IF, cls.invert_operator(cls.EXISTS),
+            name.lower(), cls.to_csv(fields, bracket=True),
         )
         return ' '.join(query)
     
     @classmethod
     def delete(cls, table, where=None):
-        query = (
-            SQLiteAPI.DELETE, SQLiteAPI.FROM, table.lower(),
-            SQLiteAPI.WHERE, str(where),
-        )
+        query = [cls.DELETE, cls.FROM, table.lower()]
+        
+        if where is not None:
+            query.extend((cls.WHERE, str(where)))
+        
         return ' '.join(query)
 
     @classmethod
     def drop_table(cls, name):
-        query = [
-            SQLiteAPI.DROP, SQLiteAPI.TABLE, SQLiteAPI.IF, SQLiteAPI.EXISTS, name.lower()
-        ]
+        query = (
+            cls.DROP, cls.TABLE, cls.IF, cls.EXISTS, name.lower()
+        )
         return ' '.join(query)
 
     @classmethod
     def insert_into(cls, table_name, field_names):
         query = (
-            SQLiteAPI.INSERT, table_name.lower(),
-            SQLiteAPI.to_csv(field_names, bracket=True),
-            SQLiteAPI.VALUES,
-            SQLiteAPI.to_csv([SQLiteAPI.PLACEHOLDER] * len(field_names), bracket=True)
+            cls.INSERT, table_name.lower(),
+            cls.to_csv(field_names, bracket=True),
+            cls.VALUES,
+            cls.to_csv([cls.PLACEHOLDER] * len(field_names), bracket=True)
         )
         return ' '.join(query)
 
@@ -100,27 +100,29 @@ class SQLiteAPI:
 
     @classmethod
     def select(cls, tables, fields=None, where=None, count=None, offset=None):
-        query = []
-
-        query.extend((
-            SQLiteAPI.SELECT, SQLiteAPI.to_csv(fields or SQLiteAPI.ALL).lower(),
-        ))
-
-        query.extend((
-            SQLiteAPI.FROM, SQLiteAPI.to_csv(tables).lower(),
-        ))
+        query = [
+            cls.SELECT, cls.to_csv(fields or cls.ALL).lower(),
+            cls.FROM, cls.to_csv(tables).lower(),
+        ]
 
         if where is not None:
-            query.extend((
-                SQLiteAPI.WHERE, str(where),
-            ))
+            query.extend((cls.WHERE, str(where)))
 
         if count is not None and offset is not None:
-            query.extend((
-                SQLiteAPI.LIMIT, str(count), SQLiteAPI.OFFSET, str(offset),
-            ))
+            query.extend((cls.LIMIT, str(count), cls.OFFSET, str(offset)))
         return ' '.join(query)
 
+    @classmethod
+    def update(cls, table_name, fields, where=None):
+        query = [
+            cls.UPDATE, table_name.lower(), cls.SET, cls.to_csv(where, bracket=False)
+        ]
+        
+        if where is not None:
+            query.extend((cls.WHERE, str(where)))
+        
+        return ' '.join(query)
+    
     @staticmethod
     def to_csv(values, bracket=False):
         """Convert a string value or a sequence of string values into a coma-separated string."""
@@ -262,7 +264,6 @@ class SelectQuery(FilterableQuery):
     def select(self, *args):
         # Allow to filter Select-Query on columns.
         self._fields = [str(field) for field in args]
-
         return self
 
     def slice(self, count, offset):
@@ -357,6 +358,31 @@ class SelectQuery(FilterableQuery):
         return [factory._make(row) for row in self._execute()]
 
 
+class UpdateQuery(FilterableQuery):
+    __slots__ = ('_model', '_table', '_fields')
+
+    def __init__(self, model):
+        super().__init__()
+        self._model = model
+        self._table = model.__name__.lower()
+        self._fields = None
+        
+    def __str__(self):
+        return ''.join(
+            ('(', SQLiteAPI.update(self._table, self._fields, self._where), ')')
+        )
+    
+    def execute(self):
+        return self._model._db.update(
+            self._table, self._fields, self._where
+        )
+
+    def set(self, *args):
+        self._fields = self._fields or []
+        self._fields.extend(args)
+        return self
+
+
 class Manager:
     __slots__ = ('_model',)
 
@@ -388,10 +414,14 @@ class Manager:
         return DeleteQuery(model=self._model).where(*args)
 
     def select(self, *args):
-        return SelectQuery(model=self._model, fields=args)
+        return SelectQuery(model=self._model).select(*args)
 
+    def update(self, *args):
+        return UpdateQuery(model=self._model).set(*args)
+        
     def where(self, *args):
         return SelectQuery(model=self._model).where(*args)
+        
 
 
 class RelatedManager(Manager):
@@ -664,6 +694,13 @@ class Database:
 
         with closing(self._connection.cursor()) as cursor:
             return cursor.execute(query).fetchall()
+
+    def update(self, table, fields, where=None):
+        query = SQLiteAPI.update(table, fields, where)
+        
+        with closing(self._connection.cursor()) as cursor:
+            cursor.execute(query)
+            self._connection.commit()
 
     def register(self, *args):
         try:

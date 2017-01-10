@@ -4,6 +4,7 @@ from utils import Trainer
 
 import pytest
 
+
 class TestDeleteQuery:
     
     def test_is_slotted(self):
