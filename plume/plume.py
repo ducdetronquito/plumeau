@@ -11,15 +11,20 @@ __all__ = [
 class SQLiteAPI:
     # Create table query
     AUTOINCREMENT = 'AUTOINCREMENT'
-    CREATE = 'CREATE TABLE'
+    CREATE = 'CREATE'
     DEFAULT = 'DEFAULT'
-    IF_NOT_EXISTS = 'IF NOT EXISTS'
+    EXISTS = 'EXISTS'
+    IF = 'IF'
     INTEGER = 'INTEGER'
     NOT_NULL = 'NOT NULL'
     PK = 'PRIMARY KEY'
     REAL = 'REAL'
+    TABLE = 'TABLE'
     TEXT = 'TEXT'
     UNIQUE = 'UNIQUE'
+
+    # Drop table query
+    DROP = 'DROP'
 
     # Insert into query
     INSERT = 'INSERT INTO'
@@ -48,16 +53,25 @@ class SQLiteAPI:
 
     opposites = {
         EQ: NE,
-        IN: ' '.join((NOT, IN))
+        IN: ' '.join((NOT, IN)),
+        EXISTS: ' '.join((NOT, EXISTS)),
     }
 
     @classmethod
     def create_table(cls, name, fields):
         query = [
-            SQLiteAPI.CREATE, SQLiteAPI.IF_NOT_EXISTS, name.lower(),
+            SQLiteAPI.CREATE, SQLiteAPI.TABLE, SQLiteAPI.IF,
+            SQLiteAPI.invert_operator(SQLiteAPI.EXISTS), name.lower(),
             SQLiteAPI.to_csv(fields, bracket=True),
         ]
 
+        return ' '.join(query)
+
+    @classmethod
+    def drop_table(cls, name):
+        query = [
+            SQLiteAPI.DROP, SQLiteAPI.TABLE, SQLiteAPI.IF, SQLiteAPI.EXISTS, name.lower()
+        ]
         return ' '.join(query)
 
     @classmethod
@@ -217,7 +231,7 @@ class SelectQuery:
             return self
 
         args = list(args)
-        
+
         if self._expression is None:
             self._expression = args.pop()
 
@@ -254,8 +268,8 @@ class SelectQuery:
                 ex: Iterator(List[Pokemon])
         """
         return iter(self.execute())
-    
-    
+
+
     def __getitem__(self, key):
         """
         Slice a SelectQuery.
@@ -290,9 +304,9 @@ class SelectQuery:
             direct_access = True
 
         self.slice(count, offset)
-            
+
         result = self.execute()
-        
+
         return result[0] if direct_access else result
 
     def _execute(self):
@@ -306,23 +320,23 @@ class SelectQuery:
         fields = self._fields or self._model._fieldnames
 
         return [
-            {fieldname: value for fieldname, value in zip(fields, row)} 
+            {fieldname: value for fieldname, value in zip(fields, row)}
             for row in self._execute()
         ]
-        
+
     def execute(self):
         """Returns a list of Model instances."""
         return [self._model(**d) for d in self.dicts()]
-    
+
     def tuples(self, named=False):
         """Output a SelectQuery as a list of tuples or namedtuples"""
         if not named:
             return self._execute()
-        
+
         fields =  self._fields or self._model._fieldnames
         factory = namedtuple('factory', fields)
         return [factory._make(row) for row in self._execute()]
-        
+
 
 class Manager:
     __slots__ = ('_model',)
@@ -578,6 +592,12 @@ class Database:
         self.db_name = db_name
         self._connection = sqlite3.connect(self.db_name)
         self._connection.execute('PRAGMA foreign_keys = ON')
+
+    def drop_table(self, model_class):
+        query = SQLiteAPI.drop_table(model_class.__name__)
+        with closing(self._connection.cursor()) as cursor:
+            cursor.execute(query)
+            self._connection.commit()
 
     def insert_into(self, query, values):
         last_row_id = None
