@@ -7,7 +7,7 @@ DB_NAME = ':memory:'
 class Trainer(Model):
     name = TextField()
     age = IntegerField()
-    
+
 
 class Pokemon(Model):
     name = TextField()

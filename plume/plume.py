@@ -242,7 +242,7 @@ class SelectQuery:
 
     def select(self, *args):
         # Allow to filter Select-Query on columns.
-        self._fields = args
+        self._fields = [str(field) for field in args]
 
         return self
 
@@ -383,23 +383,26 @@ class RelatedManager(Manager):
 
 class BaseModel(type):
     def __new__(cls, clsname, bases, attrs):
-        fieldnames = []
+        fieldnames = set()
         # Collect all field names from the base classes.
         for base in bases:
-            fieldnames.extend(getattr(base, '_fieldnames', []))
+            fieldnames.update(getattr(base, '_fieldnames', []))
+
+        fieldnames.add('pk')
+        attrs['pk'] = PrimaryKeyField()
 
         related_fields = []
         for attr_name, attr_value in attrs.items():
             # Provide to each Field subclass the name of its attribute.
             if isinstance(attr_value, Field):
                 attr_value.name = attr_name
-                fieldnames.append(attr_name)
+                fieldnames.add(attr_name)
             # Keep track of each RelatedField.
             if isinstance(attr_value, ForeignKeyField):
                 related_fields.append((attr_name, attr_value))
 
-        # Add the list of field names as attribute of the Model class.
-        attrs['_fieldnames'] = fieldnames
+        # Add the tuple of field names as attribute of the Model class.
+        attrs['_fieldnames'] = tuple(fieldnames)
 
         # Add instance factory class
         attrs['_factory'] = namedtuple('InstanceFactory', fieldnames)
@@ -413,24 +416,30 @@ class BaseModel(type):
         #Add a Manager instance as an attribute of the Model class.
         setattr(new_class, 'objects', Manager(new_class))
 
+        # Each field of the class knows its related model class name.
+        for fieldname in new_class._fieldnames:
+            getattr(new_class, fieldname).model_name = clsname.lower()
+
         # Add a Manager to each related Model.
         for attr_name, attr_value in related_fields:
             setattr(attr_value.related_model, attr_value.related_field, RelatedManager(new_class))
+
 
         return new_class
 
 
 class Field(Node):
-    __slots__ = ('value', 'name', 'required', 'unique', 'default')
+    __slots__ = ('default', 'model_name', 'name', 'required', 'unique', 'value')
     internal_type = None
     sqlite_datatype = None
 
     def __init__(self, required=True, unique=False, default=None):
-        self.value = None
+        self.default = default
+        self.model_name = None
         self.name = None
         self.required = required
         self.unique = unique
-        self.default = None
+        self.value = None
 
         if default is not None and self.is_valid(default):
             self.default = default
@@ -462,7 +471,7 @@ class Field(Node):
             instance._values._replace(**{self.name: value})
 
     def __str__(self):
-        return self.name
+        return '.'.join((self.model_name, self.name))
 
     def is_valid(self, value):
         """Return True if the provided value match the internal field."""
@@ -563,7 +572,6 @@ class ForeignKeyField(IntegerField):
 
 
 class Model(metaclass=BaseModel):
-    pk = PrimaryKeyField()
 
     def __init__(self, **kwargs):
         # Each value for the current instance is stored in a hidden dictionary.

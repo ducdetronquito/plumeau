@@ -14,16 +14,13 @@ class TestField:
             Field().__dict__
 
     def test_field_value_is_required_by_default(self):
-        a = Field()
-        assert a.required is True
+        assert Field().required is True
 
     def test_field_value_is_not_unique_by_default(self):
-        a = Field()
-        assert a.unique is False
+        assert Field().unique is False
 
     def test_default_field_value_is_not_defined(self):
-        a = Field()
-        assert a.default is None
+        assert Field().default is None
 
     def test_class_access_returns_Field_class(self):
         class User(Model):
@@ -34,12 +31,14 @@ class TestField:
     def test_instance_access_returns_field_value(self):
         class User(Model):
             field = Field()
-
         user = User(field='value')
         assert user.field == 'value'
 
 
 class TestFloatField:
+
+    class User(Model):
+        field = FloatField()
 
     def test_is_slotted(self):
         with pytest.raises(AttributeError):
@@ -63,47 +62,32 @@ class TestFloatField:
             field = FloatField(default=42)
 
     def test_allows_equal_operator(self):
-        field = FloatField()
-        field.name = 'field' # Automatically done in BaseModel.
-        criterion = (field == 6.66)
-        assert str(criterion) == "field = 6.66"
+        criterion = (self.User.field == 6.66)
+        assert str(criterion) == "user.field = 6.66"
 
     def test_allows_not_equal_operator(self):
-        field = FloatField()
-        field.name = 'field' # Automatically done in BaseModel.
-        criterion = (field != 6.66)
-        assert str(criterion) == "field != 6.66"
+        criterion = (self.User.field != 6.66)
+        assert str(criterion) == "user.field != 6.66"
 
     def test_allows_in_operator(self):
-        field = FloatField()
-        field.name = 'field' # Automatically done in BaseModel.
-        criterion = (field << [6.66, 42.0])
-
-        assert str(criterion) == "field IN (6.66, 42.0)"
+        criterion = (self.User.field << [6.66, 42.0])
+        assert str(criterion) == "user.field IN (6.66, 42.0)"
 
     def test_allows_lower_than_operator(self):
-        field = FloatField()
-        field.name = 'field' # Automatically done in BaseModel.
-        criterion = (field < 6.66)
-        assert str(criterion) == "field < 6.66"
+        criterion = (self.User.field < 6.66)
+        assert str(criterion) == "user.field < 6.66"
 
     def test_allows_lower_than_equals_operator(self):
-        field = FloatField()
-        field.name = 'field' # Automatically done in BaseModel.
-        criterion = (field <= 6.66)
-        assert str(criterion) == "field <= 6.66"
+        criterion = (self.User.field <= 6.66)
+        assert str(criterion) == "user.field <= 6.66"
 
     def test_allows_greater_than_operator(self):
-        field = FloatField()
-        field.name = 'field' # Automatically done in BaseModel.
-        criterion = (field > 6.66)
-        assert str(criterion) == "field > 6.66"
+        criterion = (self.User.field > 6.66)
+        assert str(criterion) == "user.field > 6.66"
 
     def test_allows_greater_than_equals_operator(self):
-        field = FloatField()
-        field.name = 'field' # Automatically done in BaseModel.
-        criterion = (field >= 6.66)
-        assert str(criterion) == "field >= 6.66"
+        criterion = (self.User.field >= 6.66)
+        assert str(criterion) == "user.field >= 6.66"
 
 
 class TestForeignKeyField:
@@ -128,6 +112,9 @@ class TestForeignKeyField:
 
 class TestIntegerField:
 
+    class User(Model):
+        field = IntegerField()
+
     def test_is_slotted(self):
         with pytest.raises(AttributeError):
             IntegerField().__dict__
@@ -150,47 +137,32 @@ class TestIntegerField:
             field = IntegerField(default=6.66)
 
     def test_allows_equal_operator(self):
-        field = IntegerField()
-        field.name = 'field' # Automatically done in BaseModel.
-        criterion = (field == 42)
-        assert str(criterion) == "field = 42"
+        criterion = (self.User.field == 42)
+        assert str(criterion) == "user.field = 42"
 
     def test_allows_not_equal_operator(self):
-        field = IntegerField()
-        field.name = 'field' # Automatically done in BaseModel.
-        criterion = (field != 42)
-        assert str(criterion) == "field != 42"
+        criterion = (self.User.field != 42)
+        assert str(criterion) == "user.field != 42"
 
     def test_allows_in_operator(self):
-        field = IntegerField()
-        field.name = 'field' # Automatically done in BaseModel.
-        criterion = (field << [42, 666])
-
-        assert str(criterion) == "field IN (42, 666)"
+        criterion = (self.User.field << [42, 666])
+        assert str(criterion) == "user.field IN (42, 666)"
 
     def test_allows_lower_than_operator(self):
-        field = IntegerField()
-        field.name = 'field' # Automatically done in BaseModel.
-        criterion = (field < 42)
-        assert str(criterion) == "field < 42"
+        criterion = (self.User.field < 42)
+        assert str(criterion) == "user.field < 42"
 
     def test_allows_lower_than_equals_operator(self):
-        field = IntegerField()
-        field.name = 'field' # Automatically done in BaseModel.
-        criterion = (field <= 42)
-        assert str(criterion) == "field <= 42"
+        criterion = (self.User.field <= 42)
+        assert str(criterion) == "user.field <= 42"
 
     def test_allows_greater_than_operator(self):
-        field = IntegerField()
-        field.name = 'field' # Automatically done in BaseModel.
-        criterion = (field > 42)
-        assert str(criterion) == "field > 42"
+        criterion = (self.User.field > 42)
+        assert str(criterion) == "user.field > 42"
 
     def test_allows_greater_than_equals_operator(self):
-        field = IntegerField()
-        field.name = 'field' # Automatically done in BaseModel.
-        criterion = (field >= 42)
-        assert str(criterion) == "field >= 42"
+        criterion = (self.User.field >= 42)
+        assert str(criterion) == "user.field >= 42"
 
 
 class TestPrimaryKeyField:
@@ -220,6 +192,9 @@ class TestPrimaryKeyField:
 
 class TestTextField:
 
+    class User(Model):
+        field = TextField()
+
     def test_is_slotted(self):
         with pytest.raises(AttributeError):
             TextField().__dict__
@@ -242,20 +217,13 @@ class TestTextField:
             field = TextField(default=42)
 
     def test_allows_equal_operator(self):
-        field = TextField()
-        field.name = 'field' # Automatically done in BaseModel.
-        criterion = (field == 'value')
-        assert str(criterion) == "field = 'value'"
+        criterion = (self.User.field == 'value')
+        assert str(criterion) == "user.field = 'value'"
 
     def test_allows_not_equal_operator(self):
-        field = TextField()
-        field.name = 'field' # Automatically done in BaseModel.
-        criterion = (field != 'value')
-        assert str(criterion) == "field != 'value'"
+        criterion = (self.User.field != 'value')
+        assert str(criterion) == "user.field != 'value'"
 
     def test_allows_in_operator(self):
-        field = TextField()
-        field.name = 'field' # Automatically done in BaseModel.
-        criterion = (field << ['value1', 'value2'])
-
-        assert str(criterion) == "field IN ('value1', 'value2')"
+        criterion = (self.User.field << ['value1', 'value2'])
+        assert str(criterion) == "user.field IN ('value1', 'value2')"
