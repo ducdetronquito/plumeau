@@ -37,8 +37,11 @@ class TestUpdateQueryAPI(BaseTestCase):
         query.set(Trainer.age == 18).execute()
     
     def test_can_output_selectquery_as_string(self):
-        result = str(Trainer.objects.where(Trainer.age > 18))
-        expected = "(SELECT * FROM trainer WHERE trainer.age > 18)"
+        result = str(UpdateQuery(Trainer).set(Trainer.name == 'Newbie').where(Trainer.age < 18))
+        assert (
+            '[NEED FIX] Provide a Class to handle (Expression, Expression, Expression)'
+        ) is False
+        expected = "(UPDATE trainer SET trainer.name = 'Newbie' WHERE trainer.age > 18)"
         assert result == expected
 
     def test_update_one_field_on_all_rows(self):

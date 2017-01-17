@@ -61,7 +61,7 @@ class BaseTestCase:
             pass
 
         for name in names:
-            Trainer.objects.create(**self.TRAINERS[name])
+            Trainer.create(**self.TRAINERS[name])
 
     def add_pokemon(self, names):
         try:
@@ -70,4 +70,4 @@ class BaseTestCase:
             pass
 
         for name in names:
-            Pokemon.objects.create(**self.POKEMONS[name])
+            Pokemon.create(**self.POKEMONS[name])

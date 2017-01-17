@@ -58,7 +58,7 @@ class SQLiteAPI:
     NE = '!='
     NOT = 'NOT'
 
-    opposites = {
+    invert = {
         EQ: NE,
         IN: ' '.join((NOT, IN)),
         EXISTS: ' '.join((NOT, EXISTS)),
@@ -67,7 +67,7 @@ class SQLiteAPI:
     @classmethod
     def create_table(cls, name, fields):
         query = (
-            cls.CREATE, cls.TABLE, cls.IF, cls.invert_operator(cls.EXISTS),
+            cls.CREATE, cls.TABLE, cls.IF, cls.invert[cls.EXISTS],
             name.lower(), cls.to_csv(fields, bracket=True),
         )
         return ' '.join(query)
@@ -97,10 +97,6 @@ class SQLiteAPI:
             cls.to_csv([cls.PLACEHOLDER] * len(field_names), bracket=True)
         )
         return ' '.join(query)
-
-    @classmethod
-    def invert_operator(cls, operator):
-        return cls.opposites[operator]
 
     @classmethod
     def select(cls, tables, fields=None, where=None, count=None, offset=None):
@@ -172,7 +168,7 @@ class Node:
         return Expression(self, SQLiteAPI.AND, Node.check(other))
 
     def __invert__(self):
-        self.op = SQLiteAPI.invert_operator(self.op)
+        self.op = SQLiteAPI.invert[self.op]
         return self
 
     def __le__(self, other):
@@ -387,56 +383,6 @@ class UpdateQuery(FilterableQuery):
         return self
 
 
-class Manager:
-    __slots__ = ('_model',)
-
-    def __init__(self, model):
-        self._model = model
-
-    def __get__(self, instance, owner):
-        # A Model Manager is only accessible as a class attribute.
-        if instance is None:
-            return self
-
-    def create(self, **kwargs):
-        """Return an instance of the related model."""
-        field_names = [fieldname for fieldname in self._model._fieldnames if fieldname in kwargs]
-        values = [kwargs[fieldname] for fieldname in self._model._fieldnames if fieldname in kwargs]
-
-        values = [value.pk if isinstance(value, Model) else value for value in values]
-
-        query = SQLiteAPI.insert_into(self._model.__name__, field_names)
-
-        last_row_id = self._model._db.insert_into(query, values)
-        kwargs =  {field: value for field, value in zip(field_names, values)}
-        kwargs['pk'] = last_row_id
-        instance = self._model(**kwargs)
-
-        return instance
-
-    def delete(self, *args):
-        return DeleteQuery(model=self._model).where(*args)
-
-    def select(self, *args):
-        return SelectQuery(model=self._model).select(*args)
-
-    def update(self, *args):
-        return UpdateQuery(model=self._model).set(*args)
-        
-    def where(self, *args):
-        return SelectQuery(model=self._model).where(*args)
-        
-
-
-class RelatedManager(Manager):
-    __slots__ = ()
-
-    def __get__(self, instance, owner):
-        # A RelatedManager is only accessible as an instance attribute.
-        if instance is not None:
-            return self
-
-
 class BaseModel(type):
     def __new__(cls, clsname, bases, attrs):
         fieldnames = set()
@@ -469,17 +415,9 @@ class BaseModel(type):
         # Create the new class.
         new_class = super().__new__(cls, clsname, bases, attrs)
 
-        #Add a Manager instance as an attribute of the Model class.
-        setattr(new_class, 'objects', Manager(new_class))
-
         # Each field of the class knows its related model class name.
         for fieldname in new_class._fieldnames:
             getattr(new_class, fieldname).model_name = clsname.lower()
-
-        # Add a Manager to each related Model.
-        for attr_name, attr_value in related_fields:
-            setattr(attr_value.related_model, attr_value.related_field, RelatedManager(new_class))
-
 
         return new_class
 
@@ -604,7 +542,7 @@ class ForeignKeyField(IntegerField):
         if instance is not None:
             related_pk_value = getattr(instance._values, self.name)
             related_pk_field = getattr(self.related_model, 'pk')
-            return self.related_model.objects.where(related_pk_field == related_pk_value)[0]
+            return self.related_model.where(related_pk_field == related_pk_value)[0]
         else:
             return self
 
@@ -647,6 +585,39 @@ class Model(metaclass=BaseModel):
 
     def __eq__(self, other):
         return self._values == other._values
+
+    @classmethod
+    def create(cls, **kwargs):
+        """Return an instance of the related model."""
+        field_names = [fieldname for fieldname in cls._fieldnames if fieldname in kwargs]
+        values = [kwargs[fieldname] for fieldname in cls._fieldnames if fieldname in kwargs]
+
+        values = [value.pk if isinstance(value, Model) else value for value in values]
+
+        query = SQLiteAPI.insert_into(cls.__name__, field_names)
+
+        last_row_id = cls._db.insert_into(query, values)
+        kwargs =  {field: value for field, value in zip(field_names, values)}
+        kwargs['pk'] = last_row_id
+        instance = cls(**kwargs)
+
+        return instance
+
+    @classmethod
+    def delete(cls, *args):
+        return DeleteQuery(model=cls).where(*args)
+    
+    @classmethod
+    def select(cls, *args):
+        return SelectQuery(model=cls).select(*args)
+    
+    @classmethod
+    def update(cls, *args):
+        return UpdateQuery(model=cls).set(*args)
+
+    @classmethod
+    def where(cls, *args):
+        return SelectQuery(model=cls).where(*args)
 
 
 class Database:

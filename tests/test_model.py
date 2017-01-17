@@ -1,4 +1,4 @@
-from plume.plume import Database, Manager, Model
+from plume.plume import Database, Model
 
 from utils import DB_NAME, Pokemon, Trainer
 
@@ -16,10 +16,6 @@ class TestModel:
     def test_fieldnames_class_attribute_contains_primary_key_field_name(self):
         assert len(Model._fieldnames) == 1
         assert 'pk' in Model._fieldnames
-        
-    def test_objects_attribute_links_to_a_class_specific_manager(self):
-        assert isinstance(Model.objects, Manager) is True
-        assert Model.__name__ == Model.objects._model.__name__
         
     def test_pk_field_is_empty_by_default_on_model_instance(self):
         assert Model().pk is None
@@ -47,7 +43,7 @@ class TestModel:
     def test_create_from_manager_returns_an_instance_with_pk_set(self):
         db = Database(DB_NAME)
         db.register(Trainer)
-        giovanni = Trainer.objects.create(name='Giovanni', age=42)
+        giovanni = Trainer.create(name='Giovanni', age=42)
         assert giovanni.pk == 1
         assert giovanni.name == 'Giovanni'
         assert giovanni.age == 42
@@ -55,8 +51,8 @@ class TestModel:
     def test_create_from_manager_returns_an_instance_with_pk_set_to_next_available_id(self):
         db = Database(DB_NAME)
         db.register(Trainer)
-        giovanni = Trainer.objects.create(name='Giovanni', age=42)
-        james = Trainer.objects.create(name='James', age=21)
+        giovanni = Trainer.create(name='Giovanni', age=42)
+        james = Trainer.create(name='James', age=21)
         assert giovanni.pk == 1
         assert james.pk == 2
 
@@ -64,8 +60,8 @@ class TestModel:
         db = Database(DB_NAME)
         db.register(Trainer, Pokemon)
         
-        james = Trainer.objects.create(name='James', age=21)
-        meowth = Pokemon.objects.create(name='Meowth', level=19, trainer=james)
+        james = Trainer.create(name='James', age=21)
+        meowth = Pokemon.create(name='Meowth', level=19, trainer=james)
         
         assert james.pk == 1
         assert meowth.trainer.pk == james.pk
@@ -74,10 +70,10 @@ class TestModel:
         db = Database(DB_NAME)
         db.register(Trainer, Pokemon)
         
-        james = Trainer.objects.create(name='James', age=21)
+        james = Trainer.create(name='James', age=21)
         
         with pytest.raises(sqlite3.IntegrityError):
-            Pokemon.objects.create(name='Meowth', level=19, trainer=2)
+            Pokemon.create(name='Meowth', level=19, trainer=2)
         
         
 
