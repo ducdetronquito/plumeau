@@ -41,6 +41,10 @@ class SQLiteAPI:
     OFFSET = 'OFFSET'
     SELECT = 'SELECT'
     WHERE = 'WHERE'
+    
+    #Update query
+    SET = 'SET'
+    UPDATE = 'UPDATE'
 
     # Query Operators
     AND = 'AND'
@@ -115,7 +119,7 @@ class SQLiteAPI:
     @classmethod
     def update(cls, table_name, fields, where=None):
         query = [
-            cls.UPDATE, table_name.lower(), cls.SET, cls.to_csv(where, bracket=False)
+            cls.UPDATE, table_name.lower(), cls.SET, cls.to_csv(str(fields), bracket=False)
         ]
         
         if where is not None:
@@ -222,7 +226,7 @@ class FilterableQuery:
 
 class DeleteQuery(FilterableQuery):
     """A DeleteQuery allows to forge a lazy DELETE FROM SQL query."""
-    __slots__ = ('_model', '_table', '_where')
+    __slots__ = ('_model', '_table')
     
     def __init__(self, model, where=None):
         super().__init__(where)
@@ -235,7 +239,7 @@ class DeleteQuery(FilterableQuery):
         )
 
     def execute(self):
-        self._model._db.delete(self._tables, self._fields)
+        self._model._db.delete(self._table, self._where)
 
 
 class SelectQuery(FilterableQuery):
@@ -245,7 +249,7 @@ class SelectQuery(FilterableQuery):
     clause. The user is allowed to add dynamically several criteria on a QuerySet. The SelectQuery only
     hit the database when it is iterated over or sliced.
     """
-    __slots__ = ('_model', '_tables', '_fields', '_where', '_count', '_offset')
+    __slots__ = ('_model', '_tables', '_fields', '_count', '_offset')
 
     def __init__(self, model, fields=None, where=None):
         super().__init__(where)
@@ -266,7 +270,7 @@ class SelectQuery(FilterableQuery):
         self._fields = [str(field) for field in args]
         return self
 
-    def slice(self, count, offset):
+    def limit(self, count, offset):
         """ Slice a SelectQuery without hiting the database."""
         self._count = count
         self._offset = offset
@@ -323,7 +327,7 @@ class SelectQuery(FilterableQuery):
             offset = key
             direct_access = True
 
-        self.slice(count, offset)
+        self.limit(count, offset)
 
         result = self.execute()
 
@@ -379,7 +383,7 @@ class UpdateQuery(FilterableQuery):
 
     def set(self, *args):
         self._fields = self._fields or []
-        self._fields.extend(args)
+        self._fields.extend((str(arg) for arg in args))
         return self
 
 

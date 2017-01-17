@@ -29,7 +29,8 @@ class TestDatabaseAPI:
         assert self.table_exists(Trainer) == True
 
     def test_register_a_non_custom_model(self):
-        # A error in table creation must raise an exception an must not make any change in the database.
+        # An error in table creation must raise an exception 
+        # and must not make any change in the database.
         assert self.count_tables() == 0
         
         with pytest.raises(TypeError):
