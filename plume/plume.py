@@ -22,7 +22,7 @@ class SQLiteAPI:
     TABLE = 'TABLE'
     TEXT = 'TEXT'
     UNIQUE = 'UNIQUE'
-    
+
     #Delete query
     DELETE = 'DELETE'
 
@@ -41,7 +41,7 @@ class SQLiteAPI:
     OFFSET = 'OFFSET'
     SELECT = 'SELECT'
     WHERE = 'WHERE'
-    
+
     #Update query
     SET = 'SET'
     UPDATE = 'UPDATE'
@@ -71,14 +71,14 @@ class SQLiteAPI:
             name.lower(), cls.to_csv(fields, bracket=True),
         )
         return ' '.join(query)
-    
+
     @classmethod
     def delete(cls, table, where=None):
         query = [cls.DELETE, cls.FROM, table.lower()]
-        
+
         if where is not None:
             query.extend((cls.WHERE, str(where)))
-        
+
         return ' '.join(query)
 
     @classmethod
@@ -117,12 +117,12 @@ class SQLiteAPI:
         query = [
             cls.UPDATE, table_name.lower(), cls.SET, cls.to_csv(str(fields), bracket=False)
         ]
-        
+
         if where is not None:
             query.extend((cls.WHERE, str(where)))
-        
+
         return ' '.join(query)
-    
+
     @staticmethod
     def to_csv(values, bracket=False):
         """Convert a string value or a sequence of string values into a coma-separated string."""
@@ -136,72 +136,9 @@ class SQLiteAPI:
         return '(' + csv + ')' if bracket else csv
 
 
-class Node:
-    __slots__ = ()
-
-    @staticmethod
-    def check(value):
-        # TODO: change the method name with a more explicit one.
-        if isinstance(value, str):
-            # The value is a string litteral, and must be quoted.
-            return ''.join(("'", value, "'"))
-        elif isinstance(value, list):
-            # The value is a list of litterals, and is turned into a tuple.
-            # This allows to have a valid SQL list just by calling str(value)
-            return tuple(value)
-        else:
-            return value
-
-    def __and__(self, other):
-        return Expression(self, SQLiteAPI.AND, Node.check(other))
-
-    def __eq__(self, other):
-        return Expression(self, SQLiteAPI.EQ, Node.check(other))
-
-    def __ge__(self, other):
-        return Expression(self, SQLiteAPI.GE, Node.check(other))
-
-    def __gt__(self, other):
-        return Expression(self, SQLiteAPI.GT, Node.check(other))
-
-    def __iand__(self, other):
-        return Expression(self, SQLiteAPI.AND, Node.check(other))
-
-    def __invert__(self):
-        self.op = SQLiteAPI.invert[self.op]
-        return self
-
-    def __le__(self, other):
-        return Expression(self, SQLiteAPI.LE, Node.check(other))
-
-    def __lshift__(self, other):
-        return Expression(self, SQLiteAPI.IN, Node.check(other))
-
-    def __lt__(self, other):
-        return Expression(self, SQLiteAPI.LT, Node.check(other))
-
-    def __or__(self, other):
-        return Expression(self, SQLiteAPI.OR, Node.check(other))
-
-    def __ne__(self, other):
-        return Expression(self, SQLiteAPI.NE, Node.check(other))
-
-
-class Expression(Node):
-    __slots__ = ('lo', 'op', 'ro')
-
-    def __init__(self, lo, op=None, ro=None):
-        self.lo = lo
-        self.op = op
-        self.ro = ro
-
-    def __str__(self):
-        return ' '.join((str(e) for e in (self.lo, self.op, self.ro) if e is not None))
-
-
 class FilterableQuery:
     __slots__ = ('_where',)
-    
+
     def __init__(self, where=None):
         self._where = where
 
@@ -210,7 +147,7 @@ class FilterableQuery:
             return self
 
         args = list(args)
-        
+
         if self._where is None:
             self._where = args.pop()
 
@@ -223,12 +160,12 @@ class FilterableQuery:
 class DeleteQuery(FilterableQuery):
     """A DeleteQuery allows to forge a lazy DELETE FROM SQL query."""
     __slots__ = ('_model', '_table')
-    
+
     def __init__(self, model, where=None):
         super().__init__(where)
         self._model = model
         self._table = model.__name__.lower()
-    
+
     def __str__(self):
         return ''.join(
             ('(', SQLiteAPI.delete(self._table, self._where), ')')
@@ -359,28 +296,29 @@ class SelectQuery(FilterableQuery):
 
 
 class UpdateQuery(FilterableQuery):
-    __slots__ = ('_model', '_table', '_fields')
+    __slots__ = ('_model', '_table', '_set')
 
     def __init__(self, model):
         super().__init__()
         self._model = model
         self._table = model.__name__.lower()
-        self._fields = None
-        
+        self._set = None
+
     def __str__(self):
         return ''.join(
-            ('(', SQLiteAPI.update(self._table, self._fields, self._where), ')')
+            ('(', SQLiteAPI.update(self._table, self._set, self._where), ')')
         )
-    
+
     def execute(self):
         return self._model._db.update(
-            self._table, self._fields, self._where
+            self._table, self._set, self._where
         )
 
     def set(self, *args):
-        self._fields = self._fields or []
-        self._fields.extend((str(arg) for arg in args))
-        return self
+        if not len(args):
+            return self
+
+        args = list(args)
 
 
 class BaseModel(type):
@@ -420,6 +358,67 @@ class BaseModel(type):
             getattr(new_class, fieldname).model_name = clsname.lower()
 
         return new_class
+
+class Node:
+    __slots__ = ()
+
+    def format(self, expression):
+        return expression
+
+    def __and__(self, other):
+        return Expression(self, SQLiteAPI.AND, self.format(other))
+
+    def __eq__(self, other):
+        return Expression(self, SQLiteAPI.EQ, self.format(other))
+
+    def __ge__(self, other):
+        return Expression(self, SQLiteAPI.GE, self.format(other))
+
+    def __gt__(self, other):
+        return Expression(self, SQLiteAPI.GT, self.format(other))
+
+    def __iand__(self, other):
+        return Expression(self, SQLiteAPI.AND, self.format(other))
+
+    def __invert__(self):
+        self.op = SQLiteAPI.invert[self.op]
+        return self
+
+    def __le__(self, other):
+        return Expression(self, SQLiteAPI.LE, self.format(other))
+
+    def __lt__(self, other):
+        return Expression(self, SQLiteAPI.LT, self.format(other))
+
+    def __or__(self, other):
+        return Expression(self, SQLiteAPI.OR, self.format(other))
+
+    def __ne__(self, other):
+        return Expression(self, SQLiteAPI.NE, self.format(other))
+
+    def __rshift__(self, expressions):
+        if not isinstance(expressions, SelectQuery):
+            expressions = CSExpression([self.format(exp) for exp in expressions])
+        return Expression(self, SQLiteAPI.IN, expressions)
+
+
+class Expression(Node):
+    __slots__ = ('lo', 'op', 'ro')
+
+    def __init__(self, lo, op=None, ro=None):
+        self.lo = lo
+        self.op = op
+        self.ro = ro
+
+    def __str__(self):
+        return ' '.join(str(e) for e in (self.lo, self.op, self.ro) if e is not None)
+
+
+class CSExpression(tuple):
+    """Coma-separated expression"""
+
+    def __str__(self):
+        return '(' + ', '.join(str(element) for element in self) + ')'
 
 
 class Field(Node):
@@ -496,6 +495,9 @@ class TextField(Field):
     __slots__ = ()
     internal_type = str
     sqlite_datatype = SQLiteAPI.TEXT
+
+    def format(self, expression):
+        return ''.join(("'", expression, "'")) if isinstance(expression, str) else expression
 
     def sql(self):
         field_representation = super().sql(set_default=False)
@@ -606,11 +608,11 @@ class Model(metaclass=BaseModel):
     @classmethod
     def delete(cls, *args):
         return DeleteQuery(model=cls).where(*args)
-    
+
     @classmethod
     def select(cls, *args):
         return SelectQuery(model=cls).select(*args)
-    
+
     @classmethod
     def update(cls, *args):
         return UpdateQuery(model=cls).set(*args)
@@ -630,7 +632,7 @@ class Database:
 
     def drop_table(self, model_class):
         query = SQLiteAPI.drop_table(model_class.__name__)
-        
+
         with closing(self._connection.cursor()) as cursor:
             cursor.execute(query)
             self._connection.commit()
@@ -649,11 +651,11 @@ class Database:
 
     def delete(self, table, where=None):
         query = SQLiteAPI.delete(table, where)
-        
+
         with closing(self._connection.cursor()) as cursor:
             cursor.execute(query)
             self._connection.commit()
-        
+
     def insert_into(self, query, values):
         last_row_id = None
 
@@ -672,7 +674,7 @@ class Database:
 
     def update(self, table, fields, where=None):
         query = SQLiteAPI.update(table, fields, where)
-        
+
         with closing(self._connection.cursor()) as cursor:
             cursor.execute(query)
             self._connection.commit()

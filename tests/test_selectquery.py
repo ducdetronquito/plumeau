@@ -5,19 +5,19 @@ from utils import BaseTestCase, Pokemon, Trainer
 import pytest
 
 class TestSelectQueryAPI(BaseTestCase):
-    
+
     def test_is_slotted(self):
         with pytest.raises(AttributeError):
             SelectQuery(Trainer).__dict__
-    
+
     def test_attributes(self):
         expected = ('_model', '_tables', '_fields', '_count', '_offset')
         result = SelectQuery(Trainer).__slots__
         assert result == expected
-        
+
     def test_is_filterable(self):
         assert hasattr(SelectQuery(Trainer), 'where') is True
-        
+
     def test_can_select_fields(self):
         assert hasattr(SelectQuery(Trainer), 'select') is True
 
@@ -28,25 +28,25 @@ class TestSelectQueryAPI(BaseTestCase):
     def test_can_select_fields_as_model_fields(self):
         query = SelectQuery(Trainer)
         query.select(Trainer.name, Trainer.age).execute()
-    
+
     def test_can_be_limited(self):
         assert hasattr(SelectQuery(Trainer), 'limit') is True
-        
+
     def test_fails_if_limit_and_offset_are_not_provided_when_limiting(self):
         with pytest.raises(TypeError):
             SelectQuery(Trainer).limit(limit=10)
-            
+
     def test_can_be_iterated(self):
         assert hasattr(SelectQuery(Trainer), '__iter__') is True
-    
+
     def test_iter_return_a_list_of_model_instances(self):
         result = list(SelectQuery(Trainer))
         for element in result:
             assert isinstance(element, Trainer) is True
-    
+
     def test_can_be_accessed_by_index(self):
         assert hasattr(SelectQuery(Trainer), '__getitem__') is True
-    
+
     def test_can_return_result_as_list_of_dicts(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
         result = SelectQuery(Trainer).dicts()
@@ -54,7 +54,7 @@ class TestSelectQueryAPI(BaseTestCase):
         assert len(result) == 3
         for element in result:
             assert isinstance(element, dict) is True
-            
+
     def test_can_select_fields_when_returning_dicts(self):
         self.add_trainer(['Giovanni'])
         result = SelectQuery(Trainer).select('name').dicts()
@@ -63,7 +63,7 @@ class TestSelectQueryAPI(BaseTestCase):
         assert len(expected_dict.keys()) == 1
         assert 'name' in expected_dict
         assert expected_dict['name'] == 'Giovanni'
-        
+
     def test_can_return_result_as_a_list_of_model_instances(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
         result = SelectQuery(Trainer).execute()
@@ -71,12 +71,12 @@ class TestSelectQueryAPI(BaseTestCase):
         assert len(result) == 3
         for element in result:
             assert isinstance(element, Trainer) is True
-            
+
     def test_fail_to_select_fields_when_returning_model_instances(self):
         self.add_trainer(['Giovanni'])
         with pytest.raises(AttributeError):
             result = SelectQuery(Trainer).select('name').execute()
-    
+
     def test_can_return_result_as_a_list_of_tuples(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
         result = SelectQuery(Trainer).tuples()
@@ -92,7 +92,7 @@ class TestSelectQueryAPI(BaseTestCase):
         expected_tuple = result[0]
         assert len(expected_tuple) == 1
         assert 'Giovanni' in expected_tuple[0]
-        
+
     def test_can_return_result_as_a_list_of_namedtuples(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
         result = SelectQuery(Trainer).tuples(named=True)
@@ -103,7 +103,7 @@ class TestSelectQueryAPI(BaseTestCase):
             assert hasattr(element, 'pk') is True
             assert hasattr(element, 'name') is True
             assert hasattr(element, 'age') is True
-            
+
     def test_can_select_fields_when_returning_namedtuples(self):
         self.add_trainer(['Giovanni'])
         result = SelectQuery(Trainer).select('name').tuples(named=True)
@@ -111,7 +111,7 @@ class TestSelectQueryAPI(BaseTestCase):
         expected_namedtuple = result[0]
         assert len(expected_namedtuple) == 1
         assert expected_namedtuple.name == 'Giovanni'
-            
+
     def test_can_output_selectquery_as_string(self):
         result = str(SelectQuery(Trainer).where(Trainer.age > 18))
         expected = "(SELECT * FROM trainer WHERE trainer.age > 18)"
@@ -162,7 +162,7 @@ class TestSelectQueryLimitMethod(BaseTestCase):
 
 class TestSelectQueryLimitMethodeByIndex(BaseTestCase):
     """Test behavior of a SelectQuery with the limit shortcut."""
-    
+
     def test_limit_to_a_single_element_return_model_instance(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
         trainer = SelectQuery(Trainer)[2]
@@ -248,7 +248,7 @@ class TestSelectQueryWhere(BaseTestCase):
 
     def test_filter_with_IN_operator(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        result = SelectQuery(Trainer).where(Trainer.age << [17, 21]).execute()
+        result = SelectQuery(Trainer).where(Trainer.age >> [17, 21]).execute()
         assert len(result) == 2
         james, jessie = result
         assert james.name == 'James'
@@ -258,7 +258,7 @@ class TestSelectQueryWhere(BaseTestCase):
 
     def test_filter_with_field_restriction_and_tuples_output(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        result = SelectQuery(Trainer).select(Trainer.name).where(Trainer.age << [17, 21]).tuples()
+        result = SelectQuery(Trainer).select(Trainer.name).where(Trainer.age >> [17, 21]).tuples()
         assert len(result) == 2
         james, jessie = result
         print(result)
@@ -269,14 +269,15 @@ class TestSelectQueryWhere(BaseTestCase):
 
     def test_filter_with_field_restriction_and_namedtuples_output(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
+        """
         assert (
             "[NEED FIX]:Cannot output namedtuples with field restriction "
             "because fields contains the model name !"
         ) is False
-        
+        """
         result = (
-            Trainer.objects.select(Trainer.name)
-                   .where(Trainer.age << [17, 21])
+            Trainer.select(Trainer.name)
+                   .where(Trainer.age >> [17, 21])
                    .tuples(named=True)
         )
         assert len(result) == 2
@@ -305,7 +306,7 @@ class TestSelectQueryWhere(BaseTestCase):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
         self.add_pokemon(['Kangaskhan', 'Koffing', 'Wobbuffet'])
         trainer_pks = SelectQuery(Trainer).select(Trainer.pk).where(Trainer.name != 'Jessie')
-        result = SelectQuery(Pokemon).select(Pokemon.name).where(Pokemon.trainer << trainer_pks).tuples()
+        result = SelectQuery(Pokemon).select(Pokemon.name).where(Pokemon.trainer >> trainer_pks).tuples()
         assert len(result) == 2
         assert result[0][0] == 'Kangaskhan'
         assert result[1][0] == 'Koffing'

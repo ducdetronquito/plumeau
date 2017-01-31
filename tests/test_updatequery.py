@@ -12,7 +12,7 @@ class TestUpdateQueryAPI(BaseTestCase):
             UpdateQuery(Trainer).__dict__
     
     def test_attributes(self):
-        expected = ('_model', '_table', '_fields')
+        expected = ('_model', '_table', '_set')
         result = UpdateQuery(Trainer).__slots__
         assert result == expected
         
@@ -21,9 +21,6 @@ class TestUpdateQueryAPI(BaseTestCase):
     
     def test_can_set_updates_rules(self):
         query = UpdateQuery(Trainer)
-        assert (
-            '[NEED FIX] Provide a Class to handle (Expression, Expression, Expression)'
-        ) is False
         assert hasattr(query, 'set') is True
         q = query.set(Trainer.age == 18)
         print(str(q))

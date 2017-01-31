@@ -70,7 +70,7 @@ class TestFloatField:
         assert str(criterion) == "user.field != 6.66"
 
     def test_allows_in_operator(self):
-        criterion = (self.User.field << [6.66, 42.0])
+        criterion = (self.User.field >> [6.66, 42.0])
         assert str(criterion) == "user.field IN (6.66, 42.0)"
 
     def test_allows_lower_than_operator(self):
@@ -145,7 +145,7 @@ class TestIntegerField:
         assert str(criterion) == "user.field != 42"
 
     def test_allows_in_operator(self):
-        criterion = (self.User.field << [42, 666])
+        criterion = (self.User.field >> [42, 666])
         assert str(criterion) == "user.field IN (42, 666)"
 
     def test_allows_lower_than_operator(self):
@@ -225,5 +225,6 @@ class TestTextField:
         assert str(criterion) == "user.field != 'value'"
 
     def test_allows_in_operator(self):
-        criterion = (self.User.field << ['value1', 'value2'])
+        criterion = (self.User.field >> ['value1', 'value2'])
+        print(str(criterion))
         assert str(criterion) == "user.field IN ('value1', 'value2')"
