@@ -135,70 +135,6 @@ class SQLiteAPI:
 
         return '(' + csv + ')' if bracket else csv
 
-
-class Node:
-    __slots__ = ()
-
-    @staticmethod
-    def check(value):
-        # TODO: change the method name with a more explicit one.
-        if isinstance(value, str):
-            # The value is a string litteral, and must be quoted.
-            return ''.join(("'", value, "'"))
-        elif isinstance(value, list):
-            # The value is a list of litterals, and is turned into a tuple.
-            # This allows to have a valid SQL list just by calling str(value)
-            return tuple(value)
-        else:
-            return value
-
-    def __and__(self, other):
-        return Expression(self, SQLiteAPI.AND, Node.check(other))
-
-    def __eq__(self, other):
-        return Expression(self, SQLiteAPI.EQ, Node.check(other))
-
-    def __ge__(self, other):
-        return Expression(self, SQLiteAPI.GE, Node.check(other))
-
-    def __gt__(self, other):
-        return Expression(self, SQLiteAPI.GT, Node.check(other))
-
-    def __iand__(self, other):
-        return Expression(self, SQLiteAPI.AND, Node.check(other))
-
-    def __invert__(self):
-        self.op = SQLiteAPI.invert[self.op]
-        return self
-
-    def __le__(self, other):
-        return Expression(self, SQLiteAPI.LE, Node.check(other))
-
-    def __lshift__(self, other):
-        return Expression(self, SQLiteAPI.IN, Node.check(other))
-
-    def __lt__(self, other):
-        return Expression(self, SQLiteAPI.LT, Node.check(other))
-
-    def __or__(self, other):
-        return Expression(self, SQLiteAPI.OR, Node.check(other))
-
-    def __ne__(self, other):
-        return Expression(self, SQLiteAPI.NE, Node.check(other))
-
-
-class Expression(Node):
-    __slots__ = ('lo', 'op', 'ro')
-
-    def __init__(self, lo, op=None, ro=None):
-        self.lo = lo
-        self.op = op
-        self.ro = ro
-
-    def __str__(self):
-        return ' '.join((str(e) for e in (self.lo, self.op, self.ro) if e is not None))
-
-
 class FilterableQuery:
     __slots__ = ('_where',)
     
@@ -359,28 +295,29 @@ class SelectQuery(FilterableQuery):
 
 
 class UpdateQuery(FilterableQuery):
-    __slots__ = ('_model', '_table', '_fields')
+    __slots__ = ('_model', '_table', '_set')
 
     def __init__(self, model):
         super().__init__()
         self._model = model
         self._table = model.__name__.lower()
-        self._fields = None
+        self._set = None
         
     def __str__(self):
         return ''.join(
-            ('(', SQLiteAPI.update(self._table, self._fields, self._where), ')')
+            ('(', SQLiteAPI.update(self._table, self._set, self._where), ')')
         )
     
     def execute(self):
         return self._model._db.update(
-            self._table, self._fields, self._where
+            self._table, self._set, self._where
         )
 
     def set(self, *args):
-        self._fields = self._fields or []
-        self._fields.extend((str(arg) for arg in args))
-        return self
+        if not len(args):
+            return self
+
+        args = list(args)
 
 
 class BaseModel(type):
@@ -420,6 +357,79 @@ class BaseModel(type):
             getattr(new_class, fieldname).model_name = clsname.lower()
 
         return new_class
+
+class Node:
+    __slots__ = ()
+
+    def check_string(self, expression):
+        # Check if the expression is a string. In that case, returns it quoted.
+        return ''.join(("'", expression, "'")) if isinstance(expression, str) else expression
+
+    def __and__(self, other):
+        return Expression(self, SQLiteAPI.AND, self.check_string(other))
+
+    def __eq__(self, other):
+        return Expression(self, SQLiteAPI.EQ, self.check_string(other))
+
+    def __ge__(self, other):
+        return Expression(self, SQLiteAPI.GE, self.check_string(other))
+
+    def __gt__(self, other):
+        return Expression(self, SQLiteAPI.GT, self.check_string(other))
+
+    def __iand__(self, other):
+        return Expression(self, SQLiteAPI.AND, self.check_string(other))
+
+    def __invert__(self):
+        self.op = SQLiteAPI.invert[self.op]
+        return self
+
+    def __le__(self, other):
+        return Expression(self, SQLiteAPI.LE, self.check_string(other))
+
+    def __lt__(self, other):
+        return Expression(self, SQLiteAPI.LT, self.check_string(other))
+
+    def __or__(self, other):
+        return Expression(self, SQLiteAPI.OR, self.check_string(other))
+
+    def __ne__(self, other):
+        return Expression(self, SQLiteAPI.NE, self.check_string(other))
+        
+    def __rshift__(self, other):
+        return Expression(self, SQLiteAPI.IN, BracketCSExpression(other))
+
+
+class Expression(Node):
+    __slots__ = ('lo', 'op', 'ro')
+
+    def __init__(self, lo, op=None, ro=None):
+        self.lo = lo
+        self.op = op
+        self.ro = ro
+
+    def __str__(self):
+        return ' '.join(str(e) for e in (self.lo, self.op, self.ro) if e is not None)
+
+
+class CSExpression(Expression):
+    """Coma-separated expression"""
+    __slots__ = ('_values')
+    
+    def __init__(self, iterable):
+        if isinstance(iterable, (list, tuple)):
+            self._values = [self.check_string(e) for e in iterable]
+        else:
+            self._values = [iterable]
+
+    def __str__(self):
+        return ', '.join(str(v) for v in values)
+     
+        
+class BracketCSExpression(CSExpression):
+    """Coma-separated expression between brackets"""
+    def __str__(self):
+        return '(' + super().__str__() + ')'
 
 
 class Field(Node):

@@ -248,7 +248,7 @@ class TestSelectQueryWhere(BaseTestCase):
 
     def test_filter_with_IN_operator(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        result = SelectQuery(Trainer).where(Trainer.age << [17, 21]).execute()
+        result = SelectQuery(Trainer).where(Trainer.age >> [17, 21]).execute()
         assert len(result) == 2
         james, jessie = result
         assert james.name == 'James'
@@ -258,7 +258,7 @@ class TestSelectQueryWhere(BaseTestCase):
 
     def test_filter_with_field_restriction_and_tuples_output(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        result = SelectQuery(Trainer).select(Trainer.name).where(Trainer.age << [17, 21]).tuples()
+        result = SelectQuery(Trainer).select(Trainer.name).where(Trainer.age >> [17, 21]).tuples()
         assert len(result) == 2
         james, jessie = result
         print(result)
@@ -276,7 +276,7 @@ class TestSelectQueryWhere(BaseTestCase):
         
         result = (
             Trainer.objects.select(Trainer.name)
-                   .where(Trainer.age << [17, 21])
+                   .where(Trainer.age >> [17, 21])
                    .tuples(named=True)
         )
         assert len(result) == 2
@@ -305,7 +305,7 @@ class TestSelectQueryWhere(BaseTestCase):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
         self.add_pokemon(['Kangaskhan', 'Koffing', 'Wobbuffet'])
         trainer_pks = SelectQuery(Trainer).select(Trainer.pk).where(Trainer.name != 'Jessie')
-        result = SelectQuery(Pokemon).select(Pokemon.name).where(Pokemon.trainer << trainer_pks).tuples()
+        result = SelectQuery(Pokemon).select(Pokemon.name).where(Pokemon.trainer >> trainer_pks).tuples()
         assert len(result) == 2
         assert result[0][0] == 'Kangaskhan'
         assert result[1][0] == 'Koffing'
