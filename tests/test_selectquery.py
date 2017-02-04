@@ -23,7 +23,7 @@ class TestSelectQueryAPI(BaseTestCase):
 
     def test_can_select_fields_as_strings(self):
         query = SelectQuery(Trainer)
-        query.select('name', 'age').execute()
+        query.select(Trainer.name, Trainer.age).execute()
 
     def test_can_select_fields_as_model_fields(self):
         query = SelectQuery(Trainer)
@@ -57,7 +57,7 @@ class TestSelectQueryAPI(BaseTestCase):
 
     def test_can_select_fields_when_returning_dicts(self):
         self.add_trainer(['Giovanni'])
-        result = SelectQuery(Trainer).select('name').dicts()
+        result = SelectQuery(Trainer).select(Trainer.name).dicts()
         assert len(result) == 1
         expected_dict = result[0]
         assert len(expected_dict.keys()) == 1
@@ -75,7 +75,7 @@ class TestSelectQueryAPI(BaseTestCase):
     def test_fail_to_select_fields_when_returning_model_instances(self):
         self.add_trainer(['Giovanni'])
         with pytest.raises(AttributeError):
-            result = SelectQuery(Trainer).select('name').execute()
+            result = SelectQuery(Trainer).select(Trainer.name).execute()
 
     def test_can_return_result_as_a_list_of_tuples(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
@@ -87,7 +87,7 @@ class TestSelectQueryAPI(BaseTestCase):
 
     def test_can_select_fields_when_returning_tuples(self):
         self.add_trainer(['Giovanni'])
-        result = SelectQuery(Trainer).select('name').tuples()
+        result = SelectQuery(Trainer).select(Trainer.name).tuples()
         assert len(result) == 1
         expected_tuple = result[0]
         assert len(expected_tuple) == 1
@@ -106,7 +106,7 @@ class TestSelectQueryAPI(BaseTestCase):
 
     def test_can_select_fields_when_returning_namedtuples(self):
         self.add_trainer(['Giovanni'])
-        result = SelectQuery(Trainer).select('name').tuples(named=True)
+        result = SelectQuery(Trainer).select(Trainer.name).tuples(named=True)
         assert len(result) == 1
         expected_namedtuple = result[0]
         assert len(expected_namedtuple) == 1
@@ -220,6 +220,17 @@ class TestSelectQueryWhere(BaseTestCase):
         assert giovanni.age == 42
         assert james.name == 'James'
         assert james.age == 21
+        
+    def test_filter_with_query(self):
+        self.add_trainer(['Giovanni', 'James', 'Jessie'])
+        giovanni_age = SelectQuery(Trainer).select(Trainer.age).where(Trainer.name == 'Giovanni')
+        result = SelectQuery(Trainer).where(Trainer.age < giovanni_age).execute()
+        assert len(result) == 2
+        james, jessie = result
+        assert james.name == 'James'
+        assert james.age == 21
+        assert jessie.name == 'Jessie'
+        assert jessie.age == 17
 
     def test_filter_with_AND_operator(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
@@ -255,6 +266,35 @@ class TestSelectQueryWhere(BaseTestCase):
         assert james.age == 21
         assert jessie.name == 'Jessie'
         assert jessie.age == 17
+        
+    def test_IN_operator_filter_with_query(self):
+        self.add_trainer(['Giovanni', 'James', 'Jessie'])
+        self.add_pokemon(['Kangaskhan', 'Koffing', 'Wobbuffet'])
+        trainer_pks = SelectQuery(Trainer).select(Trainer.pk).where(Trainer.name != 'Jessie')
+        result = SelectQuery(Pokemon).select(Pokemon.name).where(Pokemon.trainer >> trainer_pks).tuples()
+        assert len(result) == 2
+        assert result[0][0] == 'Kangaskhan'
+        assert result[1][0] == 'Koffing'
+        
+    def test_IN_operator_filter_with_list_of_query(self):
+        self.add_trainer(['Giovanni', 'James', 'Jessie'])
+        self.add_pokemon(['Kangaskhan', 'Koffing', 'Wobbuffet'])
+        giovanni_pk = SelectQuery(Trainer).select(Trainer.pk).where(Trainer.name == 'Giovanni')
+        james_pk = SelectQuery(Trainer).select(Trainer.pk).where(Trainer.name == 'James')
+        result = SelectQuery(Pokemon).select(Pokemon.name).where(Pokemon.trainer >> [giovanni_pk, james_pk]).tuples()
+        assert len(result) == 2
+        assert result[0][0] == 'Kangaskhan'
+        assert result[1][0] == 'Koffing'
+        
+    def test_IN_operator_filter_with_list_of_value_and_query(self):
+        self.add_trainer(['Giovanni', 'James', 'Jessie'])
+        self.add_pokemon(['Kangaskhan', 'Koffing', 'Wobbuffet'])
+        giovanni_pk = SelectQuery(Trainer).select(Trainer.pk).where(Trainer.name == 'Giovanni')
+        james_pk = 2
+        result = SelectQuery(Pokemon).select(Pokemon.name).where(Pokemon.trainer >> [giovanni_pk, james_pk]).tuples()
+        assert len(result) == 2
+        assert result[0][0] == 'Kangaskhan'
+        assert result[1][0] == 'Koffing'
 
     def test_filter_with_field_restriction_and_tuples_output(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
@@ -269,12 +309,6 @@ class TestSelectQueryWhere(BaseTestCase):
 
     def test_filter_with_field_restriction_and_namedtuples_output(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        """
-        assert (
-            "[NEED FIX]:Cannot output namedtuples with field restriction "
-            "because fields contains the model name !"
-        ) is False
-        """
         result = (
             Trainer.select(Trainer.name)
                    .where(Trainer.age >> [17, 21])
@@ -285,9 +319,9 @@ class TestSelectQueryWhere(BaseTestCase):
         print(james)
         print(result)
         assert len(james) == 1
-        assert james.trainer.name == 'James'
+        assert james.name == 'James'
         assert len(jessie) == 1
-        assert jessie.trainer.name == 'Jessie'
+        assert jessie.name == 'Jessie'
 
     def test_filter_on_table_with_related_field(self):
         self.add_trainer('Giovanni')
@@ -301,13 +335,4 @@ class TestSelectQueryWhere(BaseTestCase):
         trainer = pokemon.trainer
         assert trainer.name == 'Giovanni'
         assert trainer.age == 42
-
-    def test_filter_with_nested_query(self):
-        self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        self.add_pokemon(['Kangaskhan', 'Koffing', 'Wobbuffet'])
-        trainer_pks = SelectQuery(Trainer).select(Trainer.pk).where(Trainer.name != 'Jessie')
-        result = SelectQuery(Pokemon).select(Pokemon.name).where(Pokemon.trainer >> trainer_pks).tuples()
-        assert len(result) == 2
-        assert result[0][0] == 'Kangaskhan'
-        assert result[1][0] == 'Koffing'
-
+        

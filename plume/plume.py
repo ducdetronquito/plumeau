@@ -8,6 +8,22 @@ __all__ = [
 ]
 
 
+class CSV(tuple):
+    """Output a iterable as coma-separated value."""
+    __slots__ = ()
+    
+    def __str__(self):
+        return ', '.join(str(value) for value in self)
+        
+
+class BracketCSV(CSV):
+    """Output a iterable as coma-separated value between brackets."""
+    __slots__ = ()
+    
+    def __str__(self):
+        return '(' + super().__str__() + ')'
+
+
 class SQLiteAPI:
     # Create table query
     AUTOINCREMENT = 'AUTOINCREMENT'
@@ -19,6 +35,7 @@ class SQLiteAPI:
     NOT_NULL = 'NOT NULL'
     PK = 'PRIMARY KEY'
     REAL = 'REAL'
+    REFERENCES = 'REFERENCES'
     TABLE = 'TABLE'
     TEXT = 'TEXT'
     UNIQUE = 'UNIQUE'
@@ -68,7 +85,7 @@ class SQLiteAPI:
     def create_table(cls, name, fields):
         query = (
             cls.CREATE, cls.TABLE, cls.IF, cls.invert[cls.EXISTS],
-            name.lower(), cls.to_csv(fields, bracket=True),
+            name.lower(), str(fields),
         )
         return ' '.join(query)
 
@@ -92,18 +109,16 @@ class SQLiteAPI:
     def insert_into(cls, table_name, field_names):
         query = (
             cls.INSERT, table_name.lower(),
-            cls.to_csv(field_names, bracket=True),
+            str(field_names),
             cls.VALUES,
-            cls.to_csv([cls.PLACEHOLDER] * len(field_names), bracket=True)
+            str(BracketCSV([cls.PLACEHOLDER] * len(field_names))),
         )
         return ' '.join(query)
 
     @classmethod
     def select(cls, tables, fields=None, where=None, count=None, offset=None):
-        query = [
-            cls.SELECT, cls.to_csv(fields or cls.ALL).lower(),
-            cls.FROM, cls.to_csv(tables).lower(),
-        ]
+        fields = str(fields) if fields else cls.ALL  
+        query = [cls.SELECT, fields, cls.FROM, str(tables)]
 
         if where is not None:
             query.extend((cls.WHERE, str(where)))
@@ -111,29 +126,15 @@ class SQLiteAPI:
         if count is not None and offset is not None:
             query.extend((cls.LIMIT, str(count), cls.OFFSET, str(offset)))
         return ' '.join(query)
-
+        
     @classmethod
     def update(cls, table_name, fields, where=None):
-        query = [
-            cls.UPDATE, table_name.lower(), cls.SET, cls.to_csv(str(fields), bracket=False)
-        ]
+        query = [cls.UPDATE, table_name.lower(), cls.SET, CSV(fields)]
 
         if where is not None:
             query.extend((cls.WHERE, str(where)))
 
         return ' '.join(query)
-
-    @staticmethod
-    def to_csv(values, bracket=False):
-        """Convert a string value or a sequence of string values into a coma-separated string."""
-        try:
-            values = values.split()
-        except AttributeError:
-            pass
-
-        csv = ', '.join(values)
-
-        return '(' + csv + ')' if bracket else csv
 
 
 class FilterableQuery:
@@ -187,7 +188,7 @@ class SelectQuery(FilterableQuery):
     def __init__(self, model, fields=None, where=None):
         super().__init__(where)
         self._model = model
-        self._tables = [model.__name__.lower()]
+        self._tables = CSV([model.__name__.lower()])
         self._fields = fields
         self._count = None
         self._offset = None
@@ -200,7 +201,7 @@ class SelectQuery(FilterableQuery):
 
     def select(self, *args):
         # Allow to filter Select-Query on columns.
-        self._fields = [str(field) for field in args]
+        self._fields = CSV(args)
         return self
 
     def limit(self, count, offset):
@@ -274,7 +275,7 @@ class SelectQuery(FilterableQuery):
 
     def dicts(self, allow_fields_subset=True):
         """Query the database and returns the result as a list of dict"""
-        fields = self._fields or self._model._fieldnames
+        fields = [field.name for field in self._fields] if self._fields else self._model._fieldnames
 
         return [
             {fieldname: value for fieldname, value in zip(fields, row)}
@@ -289,8 +290,12 @@ class SelectQuery(FilterableQuery):
         """Output a SelectQuery as a list of tuples or namedtuples"""
         if not named:
             return self._execute()
-
-        fields =  self._fields or self._model._fieldnames
+        
+        if self._fields:
+            fields = CSV(field.name for field in self._fields)
+        else:
+            fields = CSV(self._model._fieldnames)
+        
         factory = namedtuple('factory', fields)
         return [factory._make(row) for row in self._execute()]
 
@@ -398,7 +403,7 @@ class Node:
 
     def __rshift__(self, expressions):
         if not isinstance(expressions, SelectQuery):
-            expressions = CSExpression([self.format(exp) for exp in expressions])
+            expressions = BracketCSV((self.format(exp) for exp in expressions))
         return Expression(self, SQLiteAPI.IN, expressions)
 
 
@@ -412,13 +417,6 @@ class Expression(Node):
 
     def __str__(self):
         return ' '.join(str(e) for e in (self.lo, self.op, self.ro) if e is not None)
-
-
-class CSExpression(tuple):
-    """Coma-separated expression"""
-
-    def __str__(self):
-        return '(' + ', '.join(str(element) for element in self) + ')'
 
 
 class Field(Node):
@@ -564,7 +562,7 @@ class ForeignKeyField(IntegerField):
 
 
     def sql(self):
-        return super().sql() + ['REFERENCES', self.related_model.__name__.lower() + '(pk)']
+        return super().sql() + [SQLiteAPI.REFERENCES, self.related_model.__name__.lower() + '(pk)']
 
 
 class Model(metaclass=BaseModel):
@@ -591,19 +589,14 @@ class Model(metaclass=BaseModel):
     @classmethod
     def create(cls, **kwargs):
         """Return an instance of the related model."""
-        field_names = [fieldname for fieldname in cls._fieldnames if fieldname in kwargs]
-        values = [kwargs[fieldname] for fieldname in cls._fieldnames if fieldname in kwargs]
-
+        fields = BracketCSV(field for field in cls._fieldnames if field in kwargs)
+        values = [kwargs[field] for field in cls._fieldnames if field in kwargs]
         values = [value.pk if isinstance(value, Model) else value for value in values]
-
-        query = SQLiteAPI.insert_into(cls.__name__, field_names)
-
-        last_row_id = cls._db.insert_into(query, values)
-        kwargs =  {field: value for field, value in zip(field_names, values)}
+    
+        last_row_id = cls._db.insert_into(cls.__name__, fields, values)
+        kwargs =  {field: value for field, value in zip(fields, values)}
         kwargs['pk'] = last_row_id
-        instance = cls(**kwargs)
-
-        return instance
+        return cls(**kwargs)
 
     @classmethod
     def delete(cls, *args):
@@ -638,10 +631,10 @@ class Database:
             self._connection.commit()
 
     def create_table(self, model_class):
-        fields = [
+        fields = BracketCSV((
             ' '.join(getattr(model_class, fieldname).sql())
             for fieldname in model_class._fieldnames
-        ]
+        ))
 
         query = SQLiteAPI.create_table(model_class.__name__, fields)
 
@@ -656,8 +649,9 @@ class Database:
             cursor.execute(query)
             self._connection.commit()
 
-    def insert_into(self, query, values):
+    def insert_into(self, table, fields, values):
         last_row_id = None
+        query = SQLiteAPI.insert_into(table, fields)
 
         with closing(self._connection.cursor()) as cursor:
             cursor.execute(query, values)
