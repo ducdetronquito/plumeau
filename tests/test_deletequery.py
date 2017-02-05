@@ -21,7 +21,7 @@ class TestDeleteQueryAPI(BaseTestCase):
 
     def test_can_output_selectquery_as_string(self):
         result = str(DeleteQuery(Trainer).where(Trainer.age > 18))
-        expected = "(DELETE FROM trainer WHERE trainer.age > 18)"
+        expected = '(DELETE FROM trainer WHERE trainer.age > 18)'
         assert result == expected
     
 
@@ -32,7 +32,9 @@ class TestDeleteQueryWhere(BaseTestCase):
         nrows = Trainer._db._connection.execute('SELECT count(*) FROM trainer').fetchone()[0]
         assert nrows == 3
         DeleteQuery(Trainer).execute()
-        nrows = Trainer._db._connection.execute('SELECT count(*) FROM trainer').fetchone()[0]
+        nrows = Trainer._db._connection.execute(
+            "SELECT count(*) FROM trainer WHERE name != 'Giovanni'"
+        ).fetchone()[0]
         assert nrows == 0
         
     def test_delete_with_filter(self):
@@ -40,15 +42,19 @@ class TestDeleteQueryWhere(BaseTestCase):
         nrows = Trainer._db._connection.execute('SELECT count(*) FROM trainer').fetchone()[0]
         assert nrows == 3
         DeleteQuery(Trainer).where(Trainer.name == 'Giovanni').execute()
-        nrows = Trainer._db._connection.execute('SELECT count(*) FROM trainer').fetchone()[0]
+        nrows = Trainer._db._connection.execute(
+            "SELECT count(*) FROM trainer WHERE name != 'Giovanni'"
+        ).fetchone()[0]
         assert nrows == 2
     
     def test_filter_with_subquery(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
         nrows = Trainer._db._connection.execute('SELECT count(*) FROM trainer').fetchone()[0]
         assert nrows == 3
-        query_filter = SelectQuery(Trainer).select(Trainer.name).where(Trainer.name == 'Giovanni')
-        DeleteQuery(Trainer).where(Trainer.name == query_filter).execute()
-        nrows = Trainer._db._connection.execute('SELECT count(*) FROM trainer').fetchone()[0]
+        giovanni_name = SelectQuery(Trainer).select(Trainer.name).where(Trainer.name == 'Giovanni')
+        DeleteQuery(Trainer).where(Trainer.name == giovanni_name).execute()
+        nrows = Trainer._db._connection.execute(
+            "SELECT count(*) FROM trainer WHERE name != 'Giovanni'"
+        ).fetchone()[0]
         assert nrows == 2
 
