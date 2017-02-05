@@ -128,8 +128,8 @@ class SQLiteAPI:
         return ' '.join(query)
         
     @classmethod
-    def update(cls, table_name, fields, where=None):
-        query = [cls.UPDATE, table_name.lower(), cls.SET, CSV(fields)]
+    def update(cls, table, fields, where=None):
+        query = [cls.UPDATE, table.lower(), cls.SET, str(fields)]
 
         if where is not None:
             query.extend((cls.WHERE, str(where)))
@@ -307,23 +307,24 @@ class UpdateQuery(FilterableQuery):
         super().__init__()
         self._model = model
         self._table = model.__name__.lower()
-        self._set = None
+        self._set = []
 
     def __str__(self):
         return ''.join(
-            ('(', SQLiteAPI.update(self._table, self._set, self._where), ')')
+            ('(', SQLiteAPI.update(self._table, CSV(self._set), self._where), ')')
         )
 
     def execute(self):
-        return self._model._db.update(
-            self._table, self._set, self._where
-        )
+        return self._model._db.update(self._table, CSV(self._set), self._where)
 
     def set(self, *args):
-        if not len(args):
-            return self
+        # Remove table name in each Expression left operand.
+        for expression in args:
+            if isinstance(expression.lo, Field):
+                expression.lo = expression.lo.name
 
-        args = list(args)
+        self._set.extend(args)
+        return self
 
 
 class BaseModel(type):
