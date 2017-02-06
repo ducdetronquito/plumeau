@@ -74,7 +74,7 @@ class TestModelResult(BaseTestCase):
 
     def test_create_allows_model_instance_as_parameter_for_foreign_key_field(self):
         james = Trainer.create(name='James', age=21)
-        meowth = Pokemon.create(name='Meowth', level=19, trainer=james)
+        meowth = Pokemon.create(name='Meowth', level=19, trainer=james.pk)
         
         assert james.pk == 1
         assert meowth.trainer.pk == james.pk
@@ -84,6 +84,29 @@ class TestModelResult(BaseTestCase):
         
         with pytest.raises(sqlite3.IntegrityError):
             Pokemon.create(name='Meowth', level=19, trainer=2)
+            
+    def test_create_many(self):
+        ntrainers = Trainer._db._connection.execute(
+            "SELECT count(*) FROM trainer WHERE name = 'Giovanni' OR name = 'James'"
+        ).fetchone()
+        
+        assert ntrainers[0] == 0
+        
+        Trainer.create_many([
+            {'name': 'Giovanni', 'age': 42},
+            {'name': 'James', 'age': 21}
+        ])
+        
+        trainers = Trainer._db._connection.execute(
+            "SELECT name, age FROM trainer WHERE name = 'Giovanni' OR name = 'James'"
+        ).fetchall()
+        
+        assert trainers[0][0] == 'Giovanni'
+        assert trainers[0][1] == 42
+        assert trainers[1][0] == 'James'
+        assert trainers[1][1] == 21
+        
+        
         
         
 

@@ -106,12 +106,12 @@ class SQLiteAPI:
         return ' '.join(query)
 
     @classmethod
-    def insert_into(cls, table_name, field_names):
+    def insert_into(cls, table, fields):
         query = (
-            cls.INSERT, table_name.lower(),
-            str(field_names),
+            cls.INSERT, table.lower(),
+            str(fields),
             cls.VALUES,
-            str(BracketCSV([cls.PLACEHOLDER] * len(field_names))),
+            str(BracketCSV([cls.PLACEHOLDER] * len(fields))),
         )
         return ' '.join(query)
 
@@ -174,6 +174,37 @@ class DeleteQuery(FilterableQuery):
 
     def execute(self):
         self._model._db.delete(self._table, self._where)
+
+
+class InsertQuery:
+    """An InsertQuery allows to forge a lazy INSERT INTO SQL query."""
+    __slots__ = ('_model', '_fields', '_values')
+
+    def __init__(self, model):
+        self._model = model
+        self._fields = None
+        self._values = []
+        
+    def execute(self):
+        if len(self._values) > 1: 
+            return self._model._db.insert_many(self._model.__name__, self._fields, self._values)
+        else:
+            return self._model._db.insert_one(self._model.__name__, self._fields, self._values[0])
+
+    def fields(self, *fields):
+        self._fields = BracketCSV(fields)
+        return self
+
+    def from_dicts(self, rows):
+        if not isinstance(rows, list):
+            rows = [rows]
+        
+        self._fields = self._fields or BracketCSV(rows[0].keys())
+
+        for row in rows:
+            self._values.append([row[field] for field in self._fields])
+        
+        return self
 
 
 class SelectQuery(FilterableQuery):
@@ -590,15 +621,14 @@ class Model(metaclass=BaseModel):
     @classmethod
     def create(cls, **kwargs):
         """Return an instance of the related model."""
-        fields = BracketCSV(field for field in cls._fieldnames if field in kwargs)
-        values = [kwargs[field] for field in cls._fieldnames if field in kwargs]
-        values = [value.pk if isinstance(value, Model) else value for value in values]
-    
-        last_row_id = cls._db.insert_into(cls.__name__, fields, values)
-        kwargs =  {field: value for field, value in zip(fields, values)}
+        last_row_id = InsertQuery(model=cls).from_dicts(kwargs).execute()
         kwargs['pk'] = last_row_id
         return cls(**kwargs)
-
+    
+    @classmethod
+    def create_many(cls, dicts):
+        InsertQuery(model=cls).from_dicts(dicts).execute()
+        
     @classmethod
     def delete(cls, *args):
         return DeleteQuery(model=cls).where(*args)
@@ -649,11 +679,11 @@ class Database:
         with closing(self._connection.cursor()) as cursor:
             cursor.execute(query)
             self._connection.commit()
-
-    def insert_into(self, table, fields, values):
+        
+    def insert_one(self, table, fields, values):
         last_row_id = None
         query = SQLiteAPI.insert_into(table, fields)
-
+        
         with closing(self._connection.cursor()) as cursor:
             cursor.execute(query, values)
             last_row_id = cursor.lastrowid
@@ -661,6 +691,13 @@ class Database:
 
         return last_row_id
 
+    def insert_many(self, table, fields, values):
+        query = SQLiteAPI.insert_into(table, fields)
+        
+        with closing(self._connection.cursor()) as cursor:
+            cursor.executemany(query, values)
+            self._connection.commit()
+        
     def select(self, tables, fields=None, where=None, count=None, offset=None):
         query = SQLiteAPI.select(tables, fields, where, count, offset)
 

@@ -99,7 +99,7 @@ class TestForeignKeyField:
         db = Database(DB_NAME)
         db.register(Trainer, Pokemon)
         james = Trainer.create(pk=1, name='James', age=21)
-        meowth = Pokemon.create(name='Meowth', level=3, trainer=james)
+        meowth = Pokemon.create(name='Meowth', level=3, trainer=james.pk)
         assert meowth.trainer.pk == 1
 
     def test_for_create_table_query_sql_output_a_list_of_keywords(self):
