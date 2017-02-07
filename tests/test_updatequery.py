@@ -12,7 +12,7 @@ class TestUpdateQueryAPI:
             UpdateQuery(Trainer).__dict__
     
     def test_attributes(self):
-        expected = ('_model', '_table', '_set')
+        expected = ('_fields', '_model', '_table')
         result = UpdateQuery(Trainer).__slots__
         assert result == expected
         

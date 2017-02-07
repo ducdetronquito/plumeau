@@ -11,7 +11,7 @@ class TestSelectQueryAPI(BaseTestCase):
             SelectQuery(Trainer).__dict__
 
     def test_attributes(self):
-        expected = ('_model', '_tables', '_fields', '_count', '_offset')
+        expected = ('_count', '_distinct', '_fields', '_model', '_offset', '_tables')
         result = SelectQuery(Trainer).__slots__
         assert result == expected
 
@@ -20,14 +20,13 @@ class TestSelectQueryAPI(BaseTestCase):
 
     def test_can_select_fields(self):
         assert hasattr(SelectQuery(Trainer), 'select') is True
-
-    def test_can_select_fields_as_strings(self):
-        query = SelectQuery(Trainer)
-        query.select(Trainer.name, Trainer.age).execute()
+        
+    def test_can_select_distinct(self):
+        assert hasattr(SelectQuery(Trainer), 'distinct') is True
 
     def test_can_select_fields_as_model_fields(self):
         query = SelectQuery(Trainer)
-        query.select(Trainer.name, Trainer.age).execute()
+        query.select(Trainer.name, Trainer.age).get()
 
     def test_can_be_limited(self):
         assert hasattr(SelectQuery(Trainer), 'limit') is True
@@ -66,7 +65,7 @@ class TestSelectQueryAPI(BaseTestCase):
 
     def test_can_return_result_as_a_list_of_model_instances(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        result = SelectQuery(Trainer).execute()
+        result = SelectQuery(Trainer).get()
         assert isinstance(result, list) is True
         assert len(result) == 3
         for element in result:
@@ -75,7 +74,7 @@ class TestSelectQueryAPI(BaseTestCase):
     def test_fail_to_select_fields_when_returning_model_instances(self):
         self.add_trainer(['Giovanni'])
         with pytest.raises(AttributeError):
-            result = SelectQuery(Trainer).select(Trainer.name).execute()
+            result = SelectQuery(Trainer).select(Trainer.name).get()
 
     def test_can_return_result_as_a_list_of_tuples(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
@@ -201,7 +200,7 @@ class TestSelectQueryWhere(BaseTestCase):
 
     def test_select_all_row(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        result = SelectQuery(Trainer).execute()
+        result = SelectQuery(Trainer).get()
         assert len(result) == 3
         giovanni, james, jessie = result
         assert giovanni.name == 'Giovanni'
@@ -213,7 +212,7 @@ class TestSelectQueryWhere(BaseTestCase):
 
     def test_select_with_one_filter(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        result = SelectQuery(Trainer).where(Trainer.age > 18).execute()
+        result = SelectQuery(Trainer).where(Trainer.age > 18).get()
         assert len(result) == 2
         giovanni, james = result
         assert giovanni.name == 'Giovanni'
@@ -224,7 +223,7 @@ class TestSelectQueryWhere(BaseTestCase):
     def test_filter_with_query(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
         giovanni_age = SelectQuery(Trainer).select(Trainer.age).where(Trainer.name == 'Giovanni')
-        result = SelectQuery(Trainer).where(Trainer.age < giovanni_age).execute()
+        result = SelectQuery(Trainer).where(Trainer.age < giovanni_age).get()
         assert len(result) == 2
         james, jessie = result
         assert james.name == 'James'
@@ -234,7 +233,7 @@ class TestSelectQueryWhere(BaseTestCase):
 
     def test_filter_with_AND_operator(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        result = SelectQuery(Trainer).where((Trainer.age > 18)  & (Trainer.name != 'Giovanni')).execute()
+        result = SelectQuery(Trainer).where((Trainer.age > 18)  & (Trainer.name != 'Giovanni')).get()
         assert len(result) == 1
         james = result[0]
         assert james.name == 'James'
@@ -242,7 +241,7 @@ class TestSelectQueryWhere(BaseTestCase):
 
     def test_filter_with_parameters_as_implicit_AND_operator(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        result = SelectQuery(Trainer).where(Trainer.age > 18, Trainer.name != 'Giovanni').execute()
+        result = SelectQuery(Trainer).where(Trainer.age > 18, Trainer.name != 'Giovanni').get()
         assert len(result) == 1
         james = result[0]
         assert james.name == 'James'
@@ -251,7 +250,7 @@ class TestSelectQueryWhere(BaseTestCase):
     def test_filters_can_be_chained(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
         selectquery = SelectQuery(Trainer).where(Trainer.age > 18)
-        result = selectquery.where(Trainer.name != 'Giovanni').execute()
+        result = selectquery.where(Trainer.name != 'Giovanni').get()
         assert len(result) == 1
         james = result[0]
         assert james.name == 'James'
@@ -259,7 +258,7 @@ class TestSelectQueryWhere(BaseTestCase):
 
     def test_filter_with_IN_operator(self):
         self.add_trainer(['Giovanni', 'James', 'Jessie'])
-        result = SelectQuery(Trainer).where(Trainer.age >> [17, 21]).execute()
+        result = SelectQuery(Trainer).where(Trainer.age >> [17, 21]).get()
         assert len(result) == 2
         james, jessie = result
         assert james.name == 'James'
@@ -326,7 +325,7 @@ class TestSelectQueryWhere(BaseTestCase):
     def test_filter_on_table_with_related_field(self):
         self.add_trainer('Giovanni')
         self.add_pokemon('Kangaskhan')
-        result = SelectQuery(Pokemon).execute()
+        result = SelectQuery(Pokemon).get()
         assert len(result) == 1
         pokemon = result[0]
         assert pokemon.name == 'Kangaskhan'
@@ -336,3 +335,19 @@ class TestSelectQueryWhere(BaseTestCase):
         assert trainer.name == 'Giovanni'
         assert trainer.age == 42
         
+    def test_can_select_distinct(self):
+        query = SelectQuery(Trainer).distinct(Trainer.name)
+        expected = '(SELECT DISTINCT trainer.name FROM trainer)'
+        assert str(query) == expected
+
+    def test_can_filter_duplicates(self):
+        self.add_trainer(['Giovanni', 'Giovanni'])
+        ntrainers = Trainer._db._connection.execute(
+            "SELECT count(name) FROM trainer WHERE name = 'Giovanni'"
+        ).fetchone()
+        assert ntrainers[0] == 2
+        
+        result = SelectQuery(Trainer).distinct(Trainer.name).tuples()
+        assert len(result) == 1
+        
+

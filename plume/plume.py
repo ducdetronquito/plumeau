@@ -53,6 +53,7 @@ class SQLiteAPI:
 
     # Select Query
     ALL = '*'
+    DISTINCT = 'DISTINCT'
     FROM = 'FROM'
     LIMIT = 'LIMIT'
     OFFSET = 'OFFSET'
@@ -90,13 +91,13 @@ class SQLiteAPI:
         return ' '.join(query)
 
     @classmethod
-    def delete(cls, table, where=None):
-        query = [cls.DELETE, cls.FROM, table.lower()]
+    def delete(cls, query):
+        output = [cls.DELETE, cls.FROM, query._table.lower()]
 
-        if where is not None:
-            query.extend((cls.WHERE, str(where)))
+        if query._filters is not None:
+            output.extend((cls.WHERE, str(query._filters)))
 
-        return ' '.join(query)
+        return ' '.join(output)
 
     @classmethod
     def drop_table(cls, name):
@@ -106,42 +107,48 @@ class SQLiteAPI:
         return ' '.join(query)
 
     @classmethod
-    def insert_into(cls, table, fields):
-        query = (
-            cls.INSERT, table.lower(),
-            str(fields),
+    def insert_into(cls, query):
+        output = (
+            cls.INSERT, query._table.lower(),
+            str(query._fields),
             cls.VALUES,
-            str(BracketCSV([cls.PLACEHOLDER] * len(fields))),
+            str(BracketCSV([cls.PLACEHOLDER] * len(query._fields))),
         )
-        return ' '.join(query)
+        return ' '.join(output)
 
     @classmethod
-    def select(cls, tables, fields=None, where=None, count=None, offset=None):
-        fields = str(fields) if fields else cls.ALL  
-        query = [cls.SELECT, fields, cls.FROM, str(tables)]
-
-        if where is not None:
-            query.extend((cls.WHERE, str(where)))
-
-        if count is not None and offset is not None:
-            query.extend((cls.LIMIT, str(count), cls.OFFSET, str(offset)))
-        return ' '.join(query)
+    def select(cls, query):
+        output = [cls.SELECT]
         
+        if query._distinct:
+            output.append(cls.DISTINCT)
+            
+        fields = str(query._fields) if query._fields else cls.ALL  
+        output.extend((fields, cls.FROM, str(query._tables).lower()))
+        
+        if query._filters is not None:
+            output.extend((cls.WHERE, str(query._filters)))
+
+        if query._count is not None and query._offset is not None:
+            output.extend((cls.LIMIT, str(query._count), cls.OFFSET, str(query._offset)))
+        
+        return' '.join(output)
+
     @classmethod
-    def update(cls, table, fields, where=None):
-        query = [cls.UPDATE, table.lower(), cls.SET, str(fields)]
+    def update(cls, query):
+        output = [cls.UPDATE, query._table.lower(), cls.SET, str(CSV(query._fields))]
 
-        if where is not None:
-            query.extend((cls.WHERE, str(where)))
+        if query._filters is not None:
+            output.extend((cls.WHERE, str(query._filters)))
 
-        return ' '.join(query)
+        return ' '.join(output)
 
 
 class FilterableQuery:
-    __slots__ = ('_where',)
+    __slots__ = ('_filters',)
 
-    def __init__(self, where=None):
-        self._where = where
+    def __init__(self, filters=None):
+        self._filters = filters
 
     def where(self, *args):
         if not len(args):
@@ -149,11 +156,11 @@ class FilterableQuery:
 
         args = list(args)
 
-        if self._where is None:
-            self._where = args.pop()
+        if self._filters is None:
+            self._filters = args.pop()
 
         for expression in args:
-            self._where &= expression
+            self._filters &= expression
 
         return self
 
@@ -165,47 +172,46 @@ class DeleteQuery(FilterableQuery):
     def __init__(self, model, where=None):
         super().__init__(where)
         self._model = model
-        self._table = model.__name__.lower()
+        self._table = model.__name__
 
     def __str__(self):
-        return ''.join(
-            ('(', SQLiteAPI.delete(self._table, self._where), ')')
-        )
+        return ''.join(('(', SQLiteAPI.delete(self), ')'))
 
     def execute(self):
-        self._model._db.delete(self._table, self._where)
+        self._model._db.delete(self)
 
 
 class InsertQuery:
     """An InsertQuery allows to forge a lazy INSERT INTO SQL query."""
-    __slots__ = ('_model', '_fields', '_values')
+    __slots__ = ('_fields', '_model', '_table', '_values')
 
     def __init__(self, model):
         self._model = model
+        self._table = model.__name__
         self._fields = None
         self._values = []
-        
-    def execute(self):
-        if len(self._values) > 1: 
-            return self._model._db.insert_many(self._model.__name__, self._fields, self._values)
-        else:
-            return self._model._db.insert_one(self._model.__name__, self._fields, self._values[0])
+    
+    def __str__(self):
+        return ''.join(('(', SQLiteAPI.insert_into(self), ')'))
 
-    def fields(self, *fields):
+    def execute(self):
+        return self._model._db.insert_into(self)
+
+    def with_fields(self, *fields):
         self._fields = BracketCSV(fields)
         return self
 
-    def from_dicts(self, rows):
-        if not isinstance(rows, list):
-            rows = [rows]
+    def from_dicts(self, dicts):
+        if not isinstance(dicts, list):
+            dicts = [dicts]
         
-        self._fields = self._fields or BracketCSV(rows[0].keys())
+        self._fields = self._fields or BracketCSV(dicts[0].keys())
 
-        for row in rows:
-            self._values.append([row[field] for field in self._fields])
+        for dct in dicts:
+            self._values.append([dct[field] for field in self._fields])
         
         return self
-
+        
 
 class SelectQuery(FilterableQuery):
     """A SelectQuery allows to forge a lazy SELECT SQL query.
@@ -214,33 +220,19 @@ class SelectQuery(FilterableQuery):
     clause. The user is allowed to add dynamically several criteria on a QuerySet. The SelectQuery only
     hit the database when it is iterated over or sliced.
     """
-    __slots__ = ('_model', '_tables', '_fields', '_count', '_offset')
+    __slots__ = ('_count', '_distinct', '_fields', '_model', '_offset', '_tables')
 
     def __init__(self, model, fields=None, where=None):
         super().__init__(where)
         self._model = model
-        self._tables = CSV([model.__name__.lower()])
+        self._tables = CSV([model.__name__])
         self._fields = fields
         self._count = None
         self._offset = None
+        self._distinct = False
 
     def __str__(self):
-        return ''.join((
-            '(', SQLiteAPI.select(
-                self._tables, self._fields, self._where, self._count, self._offset), ')'
-        ))
-
-    def select(self, *args):
-        # Allow to filter Select-Query on columns.
-        self._fields = CSV(args)
-        return self
-
-    def limit(self, count, offset):
-        """ Slice a SelectQuery without hiting the database."""
-        self._count = count
-        self._offset = offset
-
-        return self
+        return ''.join(('(', SQLiteAPI.select(self), ')'))
 
     def __iter__(self):
         """
@@ -256,7 +248,7 @@ class SelectQuery(FilterableQuery):
             An Iterator containing a model instance list.
                 ex: Iterator(List[Pokemon])
         """
-        return iter(self.execute())
+        return iter(self.get())
 
 
     def __getitem__(self, key):
@@ -294,15 +286,17 @@ class SelectQuery(FilterableQuery):
 
         self.limit(count, offset)
 
-        result = self.execute()
+        result = self.get()
 
         return result[0] if direct_access else result
 
     def _execute(self):
         """Query the database and returns the result as a list of tuples."""
-        return self._model._db.select(
-            self._tables, self._fields, self._where, self._count, self._offset,
-        )
+        return self._model._db.select(self)
+
+    def get(self):
+        """Returns a list of Model instances."""
+        return [self._model(**d) for d in self.dicts()]
 
     def dicts(self, allow_fields_subset=True):
         """Query the database and returns the result as a list of dict"""
@@ -312,10 +306,23 @@ class SelectQuery(FilterableQuery):
             {fieldname: value for fieldname, value in zip(fields, row)}
             for row in self._execute()
         ]
+    
+    def distinct(self, *fields):
+        self._distinct = True
+        self.select(*fields)
+        return self
 
-    def execute(self):
-        """Returns a list of Model instances."""
-        return [self._model(**d) for d in self.dicts()]
+    def limit(self, count, offset):
+        """ Slice a SelectQuery without hiting the database."""
+        self._count = count
+        self._offset = offset
+
+        return self
+
+    def select(self, *args):
+        # Allow to filter Select-Query on columns.
+        self._fields = CSV(args)
+        return self
 
     def tuples(self, named=False):
         """Output a SelectQuery as a list of tuples or namedtuples"""
@@ -332,21 +339,19 @@ class SelectQuery(FilterableQuery):
 
 
 class UpdateQuery(FilterableQuery):
-    __slots__ = ('_model', '_table', '_set')
+    __slots__ = ('_fields', '_model', '_table')
 
     def __init__(self, model):
         super().__init__()
         self._model = model
-        self._table = model.__name__.lower()
-        self._set = []
+        self._table = model.__name__
+        self._fields = []
 
     def __str__(self):
-        return ''.join(
-            ('(', SQLiteAPI.update(self._table, CSV(self._set), self._where), ')')
-        )
+        return ''.join(('(', SQLiteAPI.update(self), ')'))
 
     def execute(self):
-        return self._model._db.update(self._table, CSV(self._set), self._where)
+        return self._model._db.update(self)#self._table, CSV(self._set), self._where)
 
     def set(self, *args):
         # Remove table name in each Expression left operand.
@@ -354,7 +359,7 @@ class UpdateQuery(FilterableQuery):
             if isinstance(expression.lo, Field):
                 expression.lo = expression.lo.name
 
-        self._set.extend(args)
+        self._fields.extend(args)
         return self
 
 
@@ -673,39 +678,38 @@ class Database:
             cursor.execute(query)
             self._connection.commit()
 
-    def delete(self, table, where=None):
-        query = SQLiteAPI.delete(table, where)
+    def delete(self, query):
+        query = SQLiteAPI.delete(query)
 
         with closing(self._connection.cursor()) as cursor:
             cursor.execute(query)
             self._connection.commit()
         
-    def insert_one(self, table, fields, values):
-        last_row_id = None
-        query = SQLiteAPI.insert_into(table, fields)
-        
+    def insert_into(self, query):
+        return self.insert_many(query) if len(query._values) > 1 else self.insert_one(query)
+
+    def insert_one(self, query):
+        raw_query = SQLiteAPI.insert_into(query)
         with closing(self._connection.cursor()) as cursor:
-            cursor.execute(query, values)
+            cursor.execute(raw_query, query._values[0])
             last_row_id = cursor.lastrowid
             self._connection.commit()
-
         return last_row_id
 
-    def insert_many(self, table, fields, values):
-        query = SQLiteAPI.insert_into(table, fields)
-        
+    def insert_many(self, query):
+        raw_query = SQLiteAPI.insert_into(query)
         with closing(self._connection.cursor()) as cursor:
-            cursor.executemany(query, values)
+            cursor.executemany(raw_query, query._values)
             self._connection.commit()
         
-    def select(self, tables, fields=None, where=None, count=None, offset=None):
-        query = SQLiteAPI.select(tables, fields, where, count, offset)
+    def select(self, query):
+        query = SQLiteAPI.select(query)
 
         with closing(self._connection.cursor()) as cursor:
             return cursor.execute(query).fetchall()
 
-    def update(self, table, fields, where=None):
-        query = SQLiteAPI.update(table, fields, where)
+    def update(self, query):
+        query = SQLiteAPI.update(query)
 
         with closing(self._connection.cursor()) as cursor:
             cursor.execute(query)
