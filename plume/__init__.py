@@ -1,4 +1,4 @@
 from .plume import (
-    Database, Field, FloatField, ForeignKeyField, IntegerField, Model,
-    PrimaryKeyField, TextField,
+    Field, FloatField, ForeignKeyField, IntegerField, Model,
+    PrimaryKeyField, SQLiteDB, TextField,
 )

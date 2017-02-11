@@ -1,4 +1,4 @@
-from plume import Database, ForeignKeyField, IntegerField, Model, TextField
+from plume.plume import ForeignKeyField, IntegerField, InsertQuery, Model, SQLiteDB, TextField
 
 
 DB_NAME = ':memory:'
@@ -51,8 +51,8 @@ class BaseTestCase:
     }
 
     def setup_method(self):
-        db = Database(DB_NAME)
-        db.register(Trainer, Pokemon)
+        self.db = SQLiteDB(DB_NAME)
+        self.db.register(Trainer, Pokemon)
 
     def add_trainer(self, names):
         try:
@@ -61,7 +61,7 @@ class BaseTestCase:
             pass
 
         for name in names:
-            Trainer.create(**self.TRAINERS[name])
+            InsertQuery(self.db).table(Trainer).from_dicts(self.TRAINERS[name]).execute()
 
     def add_pokemon(self, names):
         try:
@@ -70,4 +70,4 @@ class BaseTestCase:
             pass
 
         for name in names:
-            Pokemon.create(**self.POKEMONS[name])
+            InsertQuery(self.db).table(Pokemon).from_dicts(self.POKEMONS[name]).execute()

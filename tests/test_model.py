@@ -1,4 +1,4 @@
-from plume.plume import Database, DeleteQuery, Model, SelectQuery, UpdateQuery
+from plume.plume import DeleteQuery, Model, SelectQuery, SQLiteDB, UpdateQuery
 
 from utils import BaseTestCase, Pokemon, Trainer
 
@@ -34,29 +34,17 @@ class TestModelAPI:
         m2 = Model(pk=2)
         assert m1 != m2
 
-    def test_can_make_update_query(self):
-        query = Trainer.update(Trainer.age == 42)
-        expected = '(UPDATE trainer SET age = 42)'
-        assert isinstance(query, UpdateQuery) is True
-        assert str(query) == expected
+    def test_has_update_method(self):
+        assert hasattr(Trainer, 'update') is True
+         
+    def test_has_delete_method(self):
+        assert hasattr(Trainer, 'delete') is True
     
-    def test_can_make_delete_query(self):
-        query = Trainer.delete(Trainer.age == 42)
-        expected = '(DELETE FROM trainer WHERE trainer.age = 42)'
-        assert isinstance(query, DeleteQuery) is True
-        assert str(query) == expected
-    
-    def test_can_make_select_query_with_select(self):
-        query = Trainer.select(Trainer.age)
-        expected = '(SELECT trainer.age FROM trainer)'
-        assert isinstance(query, SelectQuery) is True
-        assert str(query) == expected
+    def test_has_select_method(self):
+        assert hasattr(Trainer, 'select') is True
         
-    def test_can_make_select_query_with_where(self):
-        query = Trainer.where(Trainer.age == 42)
-        expected = '(SELECT * FROM trainer WHERE trainer.age = 42)'
-        assert isinstance(query, SelectQuery) is True
-        assert str(query) == expected
+    def test_has_where_method(self):
+        assert hasattr(Trainer, 'where') is True
         
 
 class TestModelResult(BaseTestCase):    
@@ -81,10 +69,10 @@ class TestModelResult(BaseTestCase):
         
     def test_create_checks_for_integrity(self):
         james = Trainer.create(name='James', age=21)
-        
+
         with pytest.raises(sqlite3.IntegrityError):
             Pokemon.create(name='Meowth', level=19, trainer=2)
-            
+
     def test_create_many(self):
         ntrainers = Trainer._db._connection.execute(
             "SELECT count(*) FROM trainer WHERE name = 'Giovanni' OR name = 'James'"
@@ -105,8 +93,9 @@ class TestModelResult(BaseTestCase):
         assert trainers[0][1] == 42
         assert trainers[1][0] == 'James'
         assert trainers[1][1] == 21
-        
-        
+
+
+            
         
         
 

@@ -1,6 +1,6 @@
 from plume.plume import (
-    Database, Field, ForeignKeyField, FloatField,
-    IntegerField, Model, PrimaryKeyField, TextField,
+    Field, ForeignKeyField, FloatField, IntegerField,
+    Model, PrimaryKeyField, SQLiteDB, TextField,
 )
 from utils import DB_NAME, Pokemon, Trainer
 
@@ -96,7 +96,7 @@ class TestForeignKeyField:
             ForeignKeyField(Pokemon, 'pokemons').__dict__
 
     def test_store_pk_of_a_model_instance(self):
-        db = Database(DB_NAME)
+        db = SQLiteDB(DB_NAME)
         db.register(Trainer, Pokemon)
         james = Trainer.create(pk=1, name='James', age=21)
         meowth = Pokemon.create(name='Meowth', level=3, trainer=james.pk)
