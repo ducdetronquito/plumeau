@@ -1,5 +1,5 @@
 from plume import *
-from plume.plume import SelectQuery
+from plume.plume import InsertQuery, SelectQuery
 from utils import BaseTestCase, Pokemon, Trainer
 
 import pytest
@@ -31,7 +31,7 @@ class TestSelectQueryAPI(BaseTestCase):
 
     def test_has_limit_method(self):
         assert hasattr(SelectQuery(self.db), 'limit') is True
-    
+
     def test_has_offset_method(self):
         assert hasattr(SelectQuery(self.db), 'offset') is True
 
@@ -93,9 +93,14 @@ class TestSelectQueryAPI(BaseTestCase):
         assert 'Giovanni' in expected_tuple[0]
 
     def test_can_output_selectquery_as_string(self):
-        result = str(SelectQuery(self.db).tables(Trainer).where(Trainer.age > 18))
+        query = SelectQuery(self.db).tables(Trainer).where(Trainer.age > 18)
         expected = "(SELECT * FROM trainer WHERE trainer.age > 18)"
-        assert result == expected
+        assert str(query) == expected
+
+    def test_can_ouput_exists_expression(self):
+        expression = SelectQuery(self.db).tables(Trainer).exists()
+        expected = 'EXISTS (SELECT * FROM trainer)'
+        assert str(expression) == expected
 
 
 class TestSelectQueryLimitMethod(BaseTestCase):
@@ -315,9 +320,22 @@ class TestSelectQueryWhere(BaseTestCase):
         result = SelectQuery(db=self.db).tables(Trainer).distinct(Trainer.name).execute()
         assert len(result) == 1
 
-    """
-    def test_can_check_if_exists(self):
-        query = Select().fields().tables()
-        expected = '(SELECT DISTINCT trainer.name FROM trainer)'
-        assert str(query) == expected
-    """
+    def test_can_select_with_exists_return_false(self):
+        result = SelectQuery(self.db).select(
+            SelectQuery(self.db).tables(Trainer).exists()
+        ).execute()
+        expected = 0
+        assert result[0][0] == expected
+
+    def test_can_select_with_exists_return_true(self):
+        InsertQuery(self.db).table(Trainer).from_dicts({
+            'name': 'Giovanni',
+            'age': 42
+        }).execute()
+
+        result = SelectQuery(self.db).select(
+            SelectQuery(self.db).tables(Trainer).exists()
+        ).execute()
+        expected = 1
+        assert result[0][0] == expected
+

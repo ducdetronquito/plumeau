@@ -26,13 +26,13 @@ class BracketCSV(CSV):
 
 class Transaction:
     __slots__ = ('connection')
-    
+
     def __init__(self, connection):
         self.connection = connection
-        
+
     def __enter__(self):
         self.connection.execute('BEGIN')
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type:
             self.connection.execute('ROLLBACK')
@@ -110,10 +110,10 @@ class SQLiteDB:
 
     def build(self, query, values=None, read_only=False):
         raw_query = query.build()
-        
+
         if read_only:
             return self.execute(raw_query, values)
-        
+
         if self._connection.in_transaction:
             return self.execute(raw_query, values)
 
@@ -126,7 +126,7 @@ class SQLiteDB:
             query._table.lower(), str(query._fields),
         )
         return ' '.join(query)
-    
+
     def build_delete(self, query):
         output = [self.DELETE, self.FROM, query._table.lower()]
 
@@ -134,7 +134,7 @@ class SQLiteDB:
             output.extend((self.WHERE, str(query._filters)))
 
         return ' '.join(output)
-    
+
     def build_drop(self, query):
         query = (
             self.DROP, self.TABLE, self.IF, self.EXISTS, query._table.lower()
@@ -157,20 +157,22 @@ class SQLiteDB:
             output.append(self.DISTINCT)
 
         fields = str(CSV(query._fields)) if query._fields else self.ALL
-        tables = (table if isinstance(table, str) else table.__name__ for table in query._tables)
-        output.extend((fields, self.FROM, str(CSV(tables)).lower()))
+        output.append(fields)
+        if query._tables:
+            tables = (table if isinstance(table, str) else table.__name__ for table in query._tables)
+            output.extend((self.FROM, str(CSV(tables)).lower()))
 
         if query._filters is not None:
             output.extend((self.WHERE, str(query._filters)))
 
         if query._limit is not None:
             output.extend((self.LIMIT, str(query._limit)))
-        
+
         if query._offset is not None:
             output.extend((self.OFFSET, str(query._offset)))
-            
+
         return ' '.join(output)
-    
+
     def build_update(self, query):
         output = [self.UPDATE, query._table.lower(), self.SET, str(CSV(query._fields))]
 
@@ -178,17 +180,17 @@ class SQLiteDB:
             output.extend((self.WHERE, str(query._filters)))
 
         return ' '.join(output)
-        
+
     def create(self):
         return CreateQuery(db=self)
-        
+
     def delete(self):
         return DeleteQuery(db=self)
-    
+
     def drop(self, table=None):
         query = DropQuery(db=self)
         return query if table is None else query.table(table)
-    
+
     def execute(self, raw_query, values=None):
         cursor = self._connection.cursor()
         if values is None:
@@ -211,7 +213,7 @@ class SQLiteDB:
 
     def select(self, *args):
         return SelectQuery(db=self).select(*args)
-    
+
     def update(self, *args):
         return UpdateQuery(db=self).fields(*args)
 
@@ -497,7 +499,7 @@ class Model(metaclass=BaseModel):
 
     @classmethod
     def update(cls, *args):
-        return UpdateQuery(db=cls._db).table(model).set(*args)
+        return UpdateQuery(db=cls._db).table(model).fields(*args)
 
     @classmethod
     def where(cls, *args):
@@ -568,7 +570,7 @@ class DeleteQuery(FilterableQuery):
 
     def __str__(self):
         return ''.join(('(', self.build(), ')'))
-    
+
     def build(self):
         return self._db.build_delete(self)
 
@@ -586,13 +588,13 @@ class DropQuery:
     def __init__(self, db):
         self._db = db
         self._table = None
-    
+
     def __str__(self):
         return self.build()
-    
+
     def build(self):
         return self._db.build_drop(self)
-        
+
     def execute(self):
         return self._db.build(self)
 
@@ -746,6 +748,9 @@ class SelectQuery(FilterableQuery):
         cursor = self._db.build(self, read_only=True)
         return cursor.fetchall()
 
+    def exists(self):
+        return Expression(self._db.EXISTS, self)
+
     def get(self):
         """Returns a list of Model instances."""
         model = self._tables[0]
@@ -755,7 +760,7 @@ class SelectQuery(FilterableQuery):
         """ Slice a SelectQuery without hiting the database."""
         self._limit = limit
         return self
-    
+
     def offset(self, offset:int):
         self._offset = offset
         return self
@@ -781,7 +786,7 @@ class UpdateQuery(FilterableQuery):
 
     def __str__(self):
         return ''.join(('(', self.build(), ')'))
-    
+
     def build(self):
         return self._db.build_update(self)
 
@@ -796,7 +801,7 @@ class UpdateQuery(FilterableQuery):
 
         self._fields.extend(args)
         return self
-        
+
     def table(self, table):
         self._table = table if isinstance(table, str) else table.__name__
         return self
