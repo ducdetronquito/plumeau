@@ -71,10 +71,13 @@ class SQLiteDB:
 
     # Select Query
     ALL = '*'
+    ASC = 'ASC'
+    DESC = 'DESC'
     DISTINCT = 'DISTINCT'
     FROM = 'FROM'
     LIMIT = 'LIMIT'
     OFFSET = 'OFFSET'
+    ORDER_BY = 'ORDER BY'
     SELECT = 'SELECT'
     WHERE = 'WHERE'
 
@@ -171,6 +174,9 @@ class SQLiteDB:
         if query._offset is not None:
             output.extend((self.OFFSET, str(query._offset)))
 
+        if query._order_by:
+            output.extend((self.ORDER_BY, str(CSV(query._order_by))))
+
         return ' '.join(output)
 
     def build_update(self, query):
@@ -248,13 +254,13 @@ class BaseModel(type):
         attrs['__slots__'] = ('_values',)
 
         # Create the new class.
-        new_class = super().__new__(cls, clsname, bases, attrs)
+        model = super().__new__(cls, clsname, bases, attrs)
 
         # Each field of the class knows its related model class name.
-        for fieldname in new_class._fieldnames:
-            getattr(new_class, fieldname).model_name = clsname.lower()
+        for fieldname in model._fieldnames:
+            getattr(model, fieldname).model = model
 
-        return new_class
+        return model
 
 class Node:
     __slots__ = ()
@@ -312,13 +318,13 @@ class Expression(Node):
 
 
 class Field(Node):
-    __slots__ = ('default', 'model_name', 'name', 'required', 'unique', 'value')
+    __slots__ = ('default', 'model', 'name', 'required', 'unique', 'value')
     internal_type = None
     sqlite_datatype = None
 
     def __init__(self, default=None, name=None, required=True, unique=False):
         self.default = default
-        self.model_name = None
+        self.model = None
         self.name = name
         self.required = required
         self.unique = unique
@@ -354,7 +360,13 @@ class Field(Node):
             instance._values._replace(**{self.name: value})
 
     def __str__(self):
-        return '.'.join((self.model_name, self.name))
+        return '.'.join((self.model.__name__.lower(), self.name))
+
+    def asc(self):
+        return ' '.join((str(self), self.model._db.ASC))
+
+    def desc(self):
+        return ' '.join((str(self), self.model._db.DESC))
 
     def is_valid(self, value):
         """Return True if the provided value match the internal field."""
@@ -651,16 +663,21 @@ class SelectQuery(FilterableQuery):
     clause. The user is allowed to add dynamically several criteria on a QuerySet. The SelectQuery only
     hit the database when it is iterated over or sliced.
     """
-    __slots__ = ('_db', '_distinct', '_fields', '_limit', '_model', '_offset', '_tables')
+    __slots__ = (
+        '_db', '_distinct', '_fields', '_limit', '_model',
+        '_offset', '_order_by', '_tables'
+    )
 
     def __init__(self, db):
         super().__init__()
         self._db = db
-        self._tables = []
+        self._distinct = False
         self._fields = []
         self._limit = None
         self._offset = None
-        self._distinct = False
+        self._order_by = []
+        self._tables = []
+
 
     def __str__(self):
         return ''.join(('(', self.build(), ')'))
@@ -763,6 +780,10 @@ class SelectQuery(FilterableQuery):
 
     def offset(self, offset:int):
         self._offset = offset
+        return self
+
+    def order_by(self, *fields):
+        self._order_by.extend(field if isinstance(field, str) else str(field) for field in fields)
         return self
 
     def select(self, *fields):

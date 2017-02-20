@@ -11,7 +11,10 @@ class TestSelectQueryAPI(BaseTestCase):
             SelectQuery(self.db).__dict__
 
     def test_attributes(self):
-        expected = ('_db', '_distinct', '_fields', '_limit', '_model', '_offset', '_tables')
+        expected = (
+            '_db', '_distinct', '_fields', '_limit', '_model',
+            '_offset', '_order_by', '_tables'
+        )
         result = SelectQuery(self.db).__slots__
         assert result == expected
 
@@ -34,6 +37,9 @@ class TestSelectQueryAPI(BaseTestCase):
 
     def test_has_offset_method(self):
         assert hasattr(SelectQuery(self.db), 'offset') is True
+
+    def test_has_order_by_method(self):
+        assert hasattr(SelectQuery(self.db), 'order_by') is True
 
     def test_can_be_iterated(self):
         assert hasattr(SelectQuery(self.db), '__iter__') is True
@@ -339,3 +345,99 @@ class TestSelectQueryWhere(BaseTestCase):
         expected = 1
         assert result[0][0] == expected
 
+
+class TestSelectQueryOrderBy(BaseTestCase):
+
+    def test_can_order_by_one_field(self):
+        query = SelectQuery(self.db).tables(Trainer).order_by(Trainer.name).build()
+        expected = 'SELECT * FROM trainer ORDER BY trainer.name'
+        assert query == expected
+
+    def test_result_order_by_one_field(self):
+        self.add_trainer(['Giovanni', 'Jessie'])
+        result = (
+            SelectQuery(self.db).select(Trainer.name).tables(Trainer)
+            .order_by(Trainer.name).execute()
+        )
+        assert result[0][0] == 'Giovanni'
+        assert result[1][0] == 'Jessie'
+
+    def test_can_order_by_one_field_as_string(self):
+        query = SelectQuery(self.db).tables(Trainer).order_by('name').build()
+        expected = 'SELECT * FROM trainer ORDER BY name'
+        assert query == expected
+
+    def test_result_order_by_one_field_as_string(self):
+        self.add_trainer(['Giovanni', 'Jessie'])
+        result = (
+            SelectQuery(self.db).select(Trainer.name).tables(Trainer)
+            .order_by('name').execute()
+        )
+        assert result[0][0] == 'Giovanni'
+        assert result[1][0] == 'Jessie'
+
+    def test_can_order_by_one_field_with_sort_order_asc(self):
+        query = SelectQuery(self.db).tables(Trainer).order_by(Trainer.name.asc()).build()
+        expected = 'SELECT * FROM trainer ORDER BY trainer.name ASC'
+        assert query == expected
+
+    def test_result_order_by_one_field_with_sort_order_asc(self):
+        self.add_trainer(['Giovanni', 'Jessie'])
+        result = (
+            SelectQuery(self.db).select(Trainer.name).tables(Trainer)
+            .order_by(Trainer.name).execute()
+        )
+        assert result[0][0] == 'Giovanni'
+        assert result[1][0] == 'Jessie'
+
+    def test_can_order_by_one_field_with_sort_order_desc(self):
+        query = SelectQuery(self.db).tables(Trainer).order_by(Trainer.name.desc()).build()
+        expected = 'SELECT * FROM trainer ORDER BY trainer.name DESC'
+        assert query == expected
+
+    def test_result_order_by_one_field_with_sort_order_desc(self):
+        self.add_trainer(['Giovanni', 'Jessie'])
+        result = (
+            SelectQuery(self.db).select(Trainer.name).tables(Trainer)
+            .order_by(Trainer.name.desc()).execute()
+        )
+        assert result[0][0] == 'Jessie'
+        assert result[1][0] == 'Giovanni'
+
+    def test_can_order_by_several_fields(self):
+        query = SelectQuery(self.db).tables(Trainer).order_by(Trainer.name, Trainer.age).build()
+        expected = 'SELECT * FROM trainer ORDER BY trainer.name, trainer.age'
+        assert query == expected
+
+    def test_result_order_by_several_fields(self):
+        InsertQuery(self.db).table(Trainer).from_dicts([
+            {'name': 'Jessie', 'age': 17},
+            {'name': 'Giovanni', 'age': 66},
+            {'name': 'Giovanni', 'age': 42}
+        ]).execute()
+
+        result = (
+            SelectQuery(self.db).select(Trainer.name, Trainer.age).tables(Trainer)
+            .order_by(Trainer.name, Trainer.age).execute()
+        )
+        assert result == [('Giovanni', 42), ('Giovanni', 66), ('Jessie', 17)]
+
+    def test_can_order_by_several_fields_with_sort_order(self):
+        query = SelectQuery(self.db).tables(Trainer).order_by(
+            Trainer.name.asc(), Trainer.age.desc()
+        ).build()
+        expected = 'SELECT * FROM trainer ORDER BY trainer.name ASC, trainer.age DESC'
+        assert query == expected
+
+    def test_result_order_by_several_fields_with_sort_order(self):
+        InsertQuery(self.db).table(Trainer).from_dicts([
+            {'name': 'Jessie', 'age': 17},
+            {'name': 'Giovanni', 'age': 66},
+            {'name': 'Giovanni', 'age': 42}
+        ]).execute()
+
+        result = (
+            SelectQuery(self.db).select(Trainer.name, Trainer.age).tables(Trainer)
+            .order_by(Trainer.name.asc(), Trainer.age.desc()).execute()
+        )
+        assert result == [('Giovanni', 66), ('Giovanni', 42), ('Jessie', 17)]
