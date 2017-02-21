@@ -2,7 +2,7 @@ from plume.plume import (
     Field, ForeignKeyField, FloatField, IntegerField,
     Model, PrimaryKeyField, SQLiteDB, TextField,
 )
-from utils import DB_NAME, Pokemon, Trainer
+from utils import Attack, Pokemon, Trainer
 
 import pytest
 
@@ -89,6 +89,13 @@ class TestFloatField:
         criterion = (self.User.field >= 6.66)
         assert str(criterion) == "user.field >= 6.66"
 
+    def test_allows_between_operator(self):
+        db = SQLiteDB(':memory:')
+        db.register(Attack)
+        expression = Attack.accuracy.between(6.66, 42.0)
+        expected = 'attack.accuracy BETWEEN 6.66 AND 42.0'
+        assert str(expression) == expected
+
 
 class TestForeignKeyField:
     def test_is_slotted(self):
@@ -96,7 +103,7 @@ class TestForeignKeyField:
             ForeignKeyField(Pokemon, 'pokemons').__dict__
 
     def test_store_pk_of_a_model_instance(self):
-        db = SQLiteDB(DB_NAME)
+        db = SQLiteDB(':memory:')
         db.register(Trainer, Pokemon)
         james = Trainer.create(pk=1, name='James', age=21)
         meowth = Pokemon.create(name='Meowth', level=3, trainer=james.pk)
@@ -164,6 +171,12 @@ class TestIntegerField:
         criterion = (self.User.field >= 42)
         assert str(criterion) == "user.field >= 42"
 
+    def test_allows_between_operator(self):
+        db = SQLiteDB(':memory:')
+        db.register(Trainer)
+        expression = Trainer.age.between(17, 42)
+        expected = 'trainer.age BETWEEN 17 AND 42'
+        assert str(expression) == expected
 
 class TestPrimaryKeyField:
 
@@ -228,3 +241,10 @@ class TestTextField:
         criterion = (self.User.field >> ['value1', 'value2'])
         print(str(criterion))
         assert str(criterion) == "user.field IN ('value1', 'value2')"
+
+    def test_allows_between_operator(self):
+        db = SQLiteDB(':memory:')
+        db.register(Trainer)
+        expression = Trainer.name.between('A', 'Z')
+        expected = "trainer.name BETWEEN 'A' AND 'Z'"
+        assert str(expression) == expected

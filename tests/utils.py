@@ -1,5 +1,7 @@
-from plume.plume import ForeignKeyField, IntegerField, InsertQuery, Model, SQLiteDB, TextField
-
+from plume.plume import (
+    FloatField, ForeignKeyField, IntegerField, InsertQuery,
+    Model, SQLiteDB, TextField
+)
 
 DB_NAME = ':memory:'
 
@@ -13,6 +15,11 @@ class Pokemon(Model):
     name = TextField()
     level = IntegerField()
     trainer = ForeignKeyField(Trainer, 'pokemons')
+
+
+class Attack(Model):
+    name = TextField()
+    accuracy = FloatField()
 
 
 class BaseTestCase:
@@ -50,9 +57,34 @@ class BaseTestCase:
         },
     }
 
+    ATTACKS = {
+        'Rage': {
+            'name': 'Rage',
+            'accuracy': 1.0
+        },
+        'Smog': {
+            'name': 'Smog',
+            'accuracy': 0.7
+        },
+        'Safeguard': {
+            'name': 'Safeguard',
+            'accuracy': 0.10
+        }
+    }
+
     def setup_method(self):
         self.db = SQLiteDB(DB_NAME)
-        self.db.register(Trainer, Pokemon)
+        self.db.register(Trainer, Pokemon, Attack)
+
+
+    def add_attack(self, names):
+        try:
+            names = names.split()
+        except:
+            pass
+
+        for name in names:
+            InsertQuery(self.db).table(Attack).from_dicts(self.ATTACKS[name]).execute()
 
     def add_trainer(self, names):
         try:

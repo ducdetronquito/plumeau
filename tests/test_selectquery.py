@@ -1,6 +1,6 @@
 from plume import *
 from plume.plume import InsertQuery, SelectQuery
-from utils import BaseTestCase, Pokemon, Trainer
+from utils import Attack, BaseTestCase, Pokemon, Trainer
 
 import pytest
 
@@ -107,6 +107,36 @@ class TestSelectQueryAPI(BaseTestCase):
         expression = SelectQuery(self.db).tables(Trainer).exists()
         expected = 'EXISTS (SELECT * FROM trainer)'
         assert str(expression) == expected
+
+
+class TestSelectQueryBetween(BaseTestCase):
+
+    def test_between_float_field(self):
+        self.add_attack(['Rage', 'Smog', 'Safeguard'])
+        result = (
+            SelectQuery(self.db).select(Attack.name).tables(Attack)
+                .where(Attack.accuracy.between(0.5, 1.0)).execute()
+        )
+        expected = [('Rage',), ('Smog',)]
+        assert result == expected
+
+    def test_between_integer_field(self):
+        self.add_trainer(['Giovanni', 'James', 'Jessie'])
+        result = (
+            SelectQuery(self.db).select(Trainer.name).tables(Trainer)
+                .where(Trainer.age.between(17, 21)).execute()
+        )
+        expected = [('James',), ('Jessie',)]
+        assert result == expected
+
+    def test_between_text_field(self):
+        self.add_trainer(['Giovanni', 'James', 'Jessie'])
+        result = (
+            SelectQuery(self.db).select(Trainer.name).tables(Trainer)
+                .where(Trainer.name.between('Jame', 'Jessiea')).execute()
+        )
+        expected = [('James',), ('Jessie',)]
+        assert result == expected
 
 
 class TestSelectQueryLimitMethod(BaseTestCase):

@@ -72,6 +72,7 @@ class SQLiteDB:
     # Select Query
     ALL = '*'
     ASC = 'ASC'
+    BETWEEN = 'BETWEEN'
     DESC = 'DESC'
     DISTINCT = 'DISTINCT'
     FROM = 'FROM'
@@ -98,9 +99,10 @@ class SQLiteDB:
     NOT = 'NOT'
 
     invert = {
+        BETWEEN: ' '.join((NOT, BETWEEN)),
         EQ: NE,
-        IN: ' '.join((NOT, IN)),
         EXISTS: ' '.join((NOT, EXISTS)),
+        IN: ' '.join((NOT, IN)),
     }
 
     def __init__(self, db_name):
@@ -265,9 +267,6 @@ class BaseModel(type):
 class Node:
     __slots__ = ()
 
-    def format(self, expression):
-        return expression
-
     def __and__(self, other):
         return Expression(self, SQLiteDB.AND, self.format(other))
 
@@ -303,6 +302,9 @@ class Node:
         if not isinstance(expressions, SelectQuery):
             expressions = BracketCSV((self.format(exp) for exp in expressions))
         return Expression(self, SQLiteDB.IN, expressions)
+
+    def format(self, expression):
+        return expression
 
 
 class Expression(Node):
@@ -364,6 +366,12 @@ class Field(Node):
 
     def asc(self):
         return ' '.join((str(self), self.model._db.ASC))
+
+    def between(self, low_boundary, high_boundary):
+        and_clause = Expression(
+            self.format(low_boundary), self.model._db.AND, self.format(high_boundary)
+        )
+        return Expression(self, self.model._db.BETWEEN, and_clause)
 
     def desc(self):
         return ' '.join((str(self), self.model._db.DESC))
