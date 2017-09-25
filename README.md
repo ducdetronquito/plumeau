@@ -1,3 +1,5 @@
+⚠️ Plumeau is not currently maintained ⚠️
+
 # Plume:
 
 ## Description:
